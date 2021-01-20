@@ -1,7 +1,10 @@
 # History files
 .Rhistory
 .Rapp.history
-
+.pdf
+.html
+*/*.pdf
+*/*.html
 # Session Data files
 .RData
 
