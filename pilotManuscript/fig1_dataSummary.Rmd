@@ -8,8 +8,13 @@ output: html_document
 ## Get Data
 
 ```{r setup, include=FALSE}
+if(!require(amlresistancenetworks)){
+require(devtools)
+devtools::install_github('sgosline/amlresistancenetworks')
+require(amlresistancenetworks)}
+
 knitr::opts_chunk$set(echo = FALSE, warning=FALSE)
-library(amlresistancenetworks)
+
 
 if(!exists('dataLoaded')){
   amlresistancenetworks::loadBeatAMLData()
