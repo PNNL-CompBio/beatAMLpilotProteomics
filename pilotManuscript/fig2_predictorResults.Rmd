@@ -1,20 +1,23 @@
 ---
 title: "Figure 2 Predictor Summary"
 author: "Sara Gosline"
-date: "11/13/2020"
+date: "02/05/2021"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 
 library(amlresistancenetworks)
 library(wesanderson)
+source("../beatAMLdata.R")
 pal<-wes_palette('Darjeeling1')
 if(!exists('dataLoaded')){
-  amlresistancenetworks::loadBeatAMLData()
+  loadBeatAMLData()
+  #loadUnNormPhosData()
   dataLoaded=TRUE
 }
+
 ```
 
 ## Building of predictors

@@ -11,9 +11,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(amlresistancenetworks)
 library(wesanderson)
+source("../beatAMLdata.R")
+
 pal<-wes_palette("Darjeeling1")
 if(!exists('dataLoaded')){
-  amlresistancenetworks::loadBeatAMLData()
+  loadBeatAMLData()
+  loadUnNormPhosData()
+
   dataLoaded=TRUE
 }
 
@@ -65,11 +69,11 @@ selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE){
   genes=getFeaturesFromString(genelist,data)
   clusterSingleDrugEfficacy(drugName,method,data,doEnrich=doEnrich,
                               auc.dat=auc.d,auc.thresh=100,
-                            genes,data.mat)  
+                            genes,data.mat)%>%subset(p.adjust<0.05)  
 }
 
   #reg.preds<<-reg.preds
-  new.results<-reg.preds%>%subset(numFeatures>0)%>%subset(MSE<1500)%>%  
+  new.results<-reg.preds%>%subset(numFeatures>2)%>%#subset(MSE<1500)%>%  
     mutate(method='LASSO',doEnrich=TRUE)%>%
     dplyr::rename(genelist='genes')%>%
    rowwise()%>%
@@ -89,7 +93,7 @@ You can also embed plots, for example:
 
 ```{r logr preds, echo=FALSE, warning=FALSE}
 
-  other.results<-log.preds%>%subset(numFeatures>2)%>%subset(MSE<0.21)%>%  
+  other.results<-log.preds%>%subset(numFeatures>2)%>%#subset(MSE<0.21)%>%  
     mutate(method='LogisticRegression',doEnrich=TRUE)%>%
     dplyr::rename(genelist='genes')%>%
    rowwise()%>%
@@ -104,7 +108,7 @@ knitr::kable(other.results)
 full.results<-rbind(mutate(new.results,Model='LASSO'),
                     mutate(other.results,Model='Logistic'))
 
-write.csv(full.results,'supp_table3_bestSigs.csv')
+write.csv(full.results,'supp_table2 _allSigs.csv')
 
 ```
 

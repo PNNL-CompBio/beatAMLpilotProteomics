@@ -13,6 +13,7 @@ library(amlresistancenetworks)
 library(wesanderson)
 library(dplyr)
 library(tidyr)
+
 ##assumes figure 2 was already generated!!!!
 reg.preds<-readRDS('lassoRegPreds.rds')%>%
   subset(var%in%c("Quizartinib (AC220)","Trametinib (GSK1120212)"))%>%
@@ -46,13 +47,16 @@ As AML cells become resistant to drugs they undergo genetic, transcriptomic and 
 tramProtData<-amlresistancenetworks::querySynapseTable('syn22986326')%>%
   subset(!is.nan(LogRatio))%>%
   mutate(Gene=unlist(Gene))%>%
-  mutate(Molecular='proteinLevels')
+  mutate(Molecular='proteinLevels')#%>%
+#  subset(!sample%in%c('M13_PAR_01','M13_PAR_02','M13_PAR_03'))
  
-tramPhosData<-amlresistancenetworks::querySynapseTable('syn22986341')%>%
+tramPhosData<-amlresistancenetworks::querySynapseTable('syn24389738')%>%
+  mutate(LogRatio=as.numeric(LogRatio))%>%
   subset(!is.nan(LogRatio))%>%
   mutate(Gene=unlist(Gene))%>%
   mutate(site=unlist(site))%>%
-  mutate(Molecular='Phosphosite')
+  mutate(Molecular='Phosphosite')#%>%
+ # subset(!sample%in%c('M13_PAR_01','M13_PAR_02','M13_PAR_03'))
 
 full.tram.prot<-tramPhosData%>%
   dplyr::select(Gene='site',LogRatio,sample,CellType,Molecular,Treatment)%>%
@@ -64,8 +68,10 @@ quizProtData<-amlresistancenetworks::querySynapseTable('syn23595222')%>%
   subset(!is.nan(value))%>%
   mutate(Gene=unlist(Gene))%>%
   mutate(Molecular='proteinLevels')
+ syn<-synapseLogin()
  
-quizPhosData<-amlresistancenetworks::querySynapseTable('syn23595223')%>%
+#quizPhosData<-syn$tableQuery('select * from syn24331593')$asDataFrame()   
+quizPhosData<-amlresistancenetworks::querySynapseTable("syn24366514")%>%
   subset(!is.nan(value))%>%
   mutate(Gene=unlist(Gene))%>%
   mutate(site=unlist(site))%>%
@@ -107,10 +113,9 @@ spreadAndSelect<-function(df,genes,mol, method,var){
   #print(annotes)
   pheatmap(mat,annotation_col=annotes, cellheight=10,cellwidth=10,
            filename=fname,clustering_method='ward.D2',annotation_colors = annote.colors, 
-           clustering_distance_cols = 'euclidean', color=pal)
+           clustering_distance_cols = 'euclidean', clustering_distance_rows='euclidean',color=pal)
   return(fname)
 }
-
 
 
 #'scatter plot
@@ -137,7 +142,7 @@ scatterPlot<-function(df,genes,mol,method,var){
 tram.preds<-subset(full.preds,var=="Trametinib (GSK1120212)")
 
 pred.plots<-tram.preds%>%subset(numFeatures>0)%>%
-  mutate(df=list(full.tram.prot))%>%
+  mutate(df=list(tibble::remove_rownames(full.tram.prot)))%>%
   dplyr::rename(mol='Molecular')%>%
   rowwise()%>%
   mutate(plotfile=spreadAndSelect(df,genes,mol,method,var))
@@ -146,12 +151,12 @@ red.tram.prot<-full.tram.prot%>%
   subset(Treatment%in%c('none','Trametinib Withdrawn'))#,'Trametinib'))
 
 red.pred.plots<-tram.preds%>%subset(numFeatures>0)%>%
-  mutate(df=list(red.tram.prot))%>%
+  mutate(df=list(tibble::remove_rownames(red.tram.prot)))%>%
   dplyr::rename(mol='Molecular')%>%
   mutate(method=paste0('red',method))%>%
   rowwise()%>%
-  mutate(plotfile=spreadAndSelect(df,genes,mol,method,var))%>%
-  mutate(scatter=scatterPlot(df,genes,mol,method,var))
+  mutate(plotfile=spreadAndSelect(df,genes,mol,method,var))#%>%
+ # mutate(scatter=scatterPlot(df,genes,mol,method,var))
 
 ```
 
@@ -161,7 +166,7 @@ red.pred.plots<-tram.preds%>%subset(numFeatures>0)%>%
 ```{r quizartinib, echo=FALSE, warning=FALSE}
 quiz.preds<-subset(full.preds,var=="Quizartinib (AC220)")
 pred.plots<-quiz.preds%>%subset(numFeatures>0)%>%
-  mutate(df=list(full.quiz.prot))%>%
+  mutate(df=list(tibble::remove_rownames(full.quiz.prot)))%>%
   rename(mol=Molecular)%>%
   rowwise()%>%
   mutate(plotfile=spreadAndSelect(df,genes,mol,method,var))
@@ -170,11 +175,76 @@ red.quiz.prot<-full.quiz.prot%>%
   subset(Treatment=='None')
 
 red.pred.plots<-quiz.preds%>%subset(numFeatures>0)%>%
-  mutate(df=list(red.quiz.prot))%>%
+  mutate(df=list(tibble::remove_rownames(red.quiz.prot)))%>%
   rename(mol=Molecular)%>%
   mutate(method=paste0('red',method))%>%
   rowwise()%>%
-  mutate(plotfile=spreadAndSelect(df,genes,mol,method,var))%>%
-  mutate(scatter=scatterPlot(df,genes,mol,method,var))
+  mutate(plotfile=spreadAndSelect(df,genes,mol,method,var))#%>%
+#  mutate(scatter=scatterPlot(df,genes,mol,method,var))
 ```
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+### Networks
+We compute networks from the combination of both proteomics and phosphoproteomics
+
+
+####Trametinib
+```{r tram ,echo=FALSE,warning=FALSE}
+fname=paste0('LASSSO-trametinib-preds')
+print(fname)    
+
+tram.preds%>%
+  subset(method=='LASSO')%>%
+  select(genes,Molecular)
+ph.genelist<-getFeaturesFromString(subset(tram.preds,Molecular=='Phosphosite')$genes,'Phosphosite')
+pr.genelist<-getFeaturesFromString(subset(tram.preds,Molecular=='proteinLevels')$genes,'proteinLevels')
+  
+
+    ##now we need to fix the gene list, since it's not going to match    
+phgenes<-data.frame(genes=ph.genelist)%>%
+  separate(genes, into=c('gene','mod'),sep='-')%>%
+  mutate(modlist=strsplit(mod,split='s|t|y'))%>%
+  apply(1,function(x) paste(x$gene,x$modlist,sep='-'))%>%
+  unlist()%>%unique()
+
+phos.vals<-rep(1.5,length(phgenes))  
+names(phos.vals)<-phgenes
+  
+prot.vals<-rep(1,length(pr.genelist))
+names(prot.vals)<-pr.genelist
+
+het=computePhosphoNetwork(phos.vals,prot.vals,nrand=100,beta=2,fname)
+#library(PCSF)
+#plot.PCSF(het)
+
+```
+ 
+#### Quizartinib
+```{r quiz networks,echo=FALSE,warning=FALSE}
+fname=paste0('LASSSO-quizartinib-preds')
+print(fname)    
+
+quiz.preds%>%
+  subset(method=='LASSO')%>%
+  select(genes,Molecular)
+ph.genelist<-getFeaturesFromString(subset(quiz.preds,Molecular=='Phosphosite')$genes,'Phosphosite')
+pr.genelist<-getFeaturesFromString(subset(quiz.preds,Molecular=='proteinLevels')$genes,'proteinLevels')
+  
+
+    ##now we need to fix the gene list, since it's not going to match    
+phgenes<-data.frame(genes=ph.genelist)%>%
+  separate(genes, into=c('gene','mod'),sep='-')%>%
+  mutate(modlist=strsplit(mod,split='s|t|y'))%>%
+  apply(1,function(x) paste(x$gene,x$modlist,sep='-'))%>%
+  unlist()%>%unique()
+
+phos.vals<-rep(1.5,length(phgenes))  
+names(phos.vals)<-phgenes
+  
+prot.vals<-rep(1,length(pr.genelist))
+names(prot.vals)<-pr.genelist
+
+het=computePhosphoNetwork(phos.vals,prot.vals,nrand=100,beta=2,fname)
+#library(PCSF)
+#plot.PCSF(het)

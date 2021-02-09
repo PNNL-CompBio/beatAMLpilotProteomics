@@ -12,7 +12,9 @@ library(amlresistancenetworks)
 library(wesanderson)
 pal<-wes_palette('Darjeeling1')
 if(!exists('dataLoaded')){
-  amlresistancenetworks::loadBeatAMLData()
+  source("../beatAMLdata.R")
+  loadBeatAMLData()
+  loadUnNormPhosData()  
   dataLoaded=TRUE
 }
 

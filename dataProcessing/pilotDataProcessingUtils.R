@@ -1,5 +1,6 @@
 ##Scripts to show howw we processed data for the pilot
 ##################################BEATAML PATIENT samPles##################
+library(amlresistancenetworks)
 
 getPatientTranscript<-function(patientlist){
   library(dplyr)
@@ -237,11 +238,75 @@ getPatientPhosphoBaselines<-function(){
         dplyr::mutate(Sample=stringr::str_replace(specId,stringr::fixed("."),"-"))%>%
         dplyr::select(Sample,Gene, site,Peptide,LogFoldChange)%>%
       mutate(LogFoldChange=as.numeric(LogFoldChange))%>%
-      mutate(LogFoldChange=tidyr::replace_na(LogFoldChange,0))
+      subset(!is.na(LogFoldChange))
+    
+    #  mutate(LogFoldChange=tidyr::replace_na(LogFoldChange,0))
 
     synTableStore(patientPhosphoSamples,'BeatAML Pilot Phosphoproteomics')
 
     return(patientPhosphoSamples)
+}
+
+  ##Added 2/1/2021 --> decided we needed uncorrected phospho
+getUnNormPhosphoBaselines<-function(){
+  library(dplyr)
+  syn<-synapseLogin()
+     dat<-read.table(syn$get('syn24610481')$path,sep='\t',header=T)
+
+    patientPhosphoSamples<-dat%>%
+        tidyr::pivot_longer(-c(Entry,Gene,site,Peptide,ids,Entry_name),"Sample",
+                            values_to='LogFoldChange')%>%
+        dplyr::mutate(specId=stringr::str_replace(Sample,"X",""))%>%
+        dplyr::mutate(Sample=stringr::str_replace(specId,stringr::fixed("."),"-"))%>%
+        dplyr::select(Sample,Gene, site,Peptide,LogFoldChange)%>%
+      mutate(LogFoldChange=as.numeric(LogFoldChange))%>%
+      mutate(LogFoldChange=tidyr::replace_na(LogFoldChange,0))
+
+    synTableStore(patientPhosphoSamples,'BeatAML Pilot Phosphoproteomics Unnormalized')
+
+    return(patientPhosphoSamples)
+
+}
+
+
+getNewSorafenibPhospho<-function(){
+  ##Added 2/1/2021 --> decided we needed uncorrected phospho
+  library(dplyr)
+  library(tibble)
+  syn<-synapseLogin()
+  metadata<-readxl::read_xlsx(syn$get('syn22314059')$path)%>%
+    dplyr::select(specimen='Specimen ID',`FLT ITD`, `Sorafenib sensitivity`,`Sorafenib IC50`, `Cell number`,`Treatment`)%>%
+    rowwise()%>%mutate(`AML sample`=stringr::str_split_fixed(specimen,stringr::fixed('.'),2)[1])%>%
+    subset(!is.na(Treatment))
+   
+  phdat<-read.csv2(syn$get('syn22313433')$path,sep='\t')%>%
+    dplyr::select(-Entry,ids)%>%
+    tidyr::pivot_longer(-c(Gene,site,Peptide),values_to='LogFoldChange',names_to='specIds')%>%
+    mutate(LogFoldChange=as.numeric(as.character(LogFoldChange)))%>%
+    mutate(LogFoldChange=tidyr::replace_na(LogFoldChange,0))%>%
+    mutate(specimen=stringr::str_replace(specIds,'X',''))%>%
+    mutate(specimen=stringr::str_replace(specimen,'\\.','-'))%>%
+    left_join(metadata)%>%select(-c(specIds,specimen))%>%distinct()%>%subset(!is.na(`AML sample`))
+  
+    synTableStore(phdat,'Sorafenib treated Phosphoproteomics Unnormalized')
+
+}
+
+getNewComboPhospho<-function(){
+  #Added 2/2/2020 --> uncorrected phospho
+  library(dplyr)
+   metadata<-amlresistancenetworks::readAndTidySensMetadata()
+  syn<-synapseLogin()
+  dat<-read.table(syn$get('syn24240354')$path,sep='\t',header=T)
+  gilt.sens.pdata<-dat%>%
+    tidyr::pivot_longer(-c(Entry,Gene,site,Peptide,ids),"Sample")%>%
+    dplyr::mutate(Barcode=as.numeric(stringr::str_replace(Sample,"X","")))%>%
+    dplyr::left_join(metadata,by='Barcode')%>%
+    mutate(value=tidyr::replace_na(value,0))
+
+  synTableStore(gilt.sens.pdata,'Drug Combination Phosphoproteomic Unnormalized')
+  return(gilt.sens.pdata)
+
 }
 
 #' getSorafenibSamples
@@ -258,7 +323,7 @@ getSorafenibSamples<-function(){
     rowwise()%>%mutate(`AML sample`=stringr::str_split_fixed(specimen,stringr::fixed('.'),2)[1])%>%
     subset(!is.na(Treatment))
   
-  pdat<-read.csv2(syn$get('syn22313435')$path,sep='\t')%>%
+  pdat<-read.csv2(syn$get('syn24227680')$path,sep='\t')%>%
     dplyr::select(-ids)%>%
     tidyr::pivot_longer(-Gene,values_to='LogFoldChange',names_to='specIds')%>%
     mutate(LogFoldChange=as.numeric(as.character(LogFoldChange)))%>%

@@ -3,7 +3,7 @@
 #'data - it's pretty big
 ##just looad all the data for this project in a single file
 
-
+library(amlresistancenetworks)
 #'summarize dataset
 #'@param auc.data - AUC data and clinical
 #'@param mol.data -molelcular data
@@ -49,9 +49,11 @@ loadBeatAMLMolecularData<-function(){
     mutate(binaryMutations=ifelse(geneMutations==0,0,1))
   
   pat.data<<-querySynapseTable("syn22314121")%>%
+    mutate(Gene=unlist(Gene))%>%
     subset(Treatment=='Vehicle')%>%
     subset(`Cell number`>=10000000)%>%
-    dplyr::select(Gene,LogFoldChange,`AML sample`)%>%distinct()%>%
+    dplyr::select(Gene,LogFoldChange,`AML sample`)%>%
+    distinct()%>%
     full_join(orig.data,by=c('AML sample','Gene'))%>%
     rowwise()%>%
     mutate(proteinLevels=max(proteinLevels,LogFoldChange,na.rm=T))%>%
@@ -62,33 +64,62 @@ loadBeatAMLMolecularData<-function(){
  # mutate(countMetric=unlist(countMetric))%>%
    distinct()
   
-  ###replace values in original table....
-  print("Getting phosphosite data")
-  pat.phos<-querySynapseTable("syn22156830")
-  pat.phos$site<-unlist(pat.phos$site)
-  pat.phos$Gene<-unlist(pat.phos$Gene)
+  # ###replace values in original table....
+   print("Getting site-corrected phosphosite data")
+   p.pat.phos<-querySynapseTable("syn22156830")%>%
+     mutate(site=unlist(site))%>%
+     mutate(Gene=unlist(Gene))
+   
+   
+   extra.phos<-querySynapseTable("syn22156814")%>%
+     dplyr::select(Gene,site,Peptide,LogFoldChange='value',Sample="AML sample")%>%
+    mutate(site=unlist(site))%>%
+     mutate(Gene=unlist(Gene))
+   
+   
+   soraf.phos<-querySynapseTable("syn22314122")%>%
+     subset(Treatment=='Vehicle')%>%
+     subset(`Cell number`>=10000000)%>%
+     dplyr::select(Gene,site,Peptide,LogFoldChange,Sample="AML sample")%>%
+     distinct()%>%
+     mutate(site=unlist(site))%>%
+     mutate(Gene=unlist(Gene))
+  
+  orig.pat.phos<<-rbind(p.pat.phos,unique(extra.phos),soraf.phos)
+  # 
+  # ##getting kinase
+  # print('Getting kinase estimates')
+  # pat.kin <<-mapPhosphoToKinase(pat.phos)
+  pat.phos<<-loadUnNormPhosData()
+  
+}
 
 
-  extra.phos<-querySynapseTable("syn22156814")%>%
-    dplyr::select(Gene,site,Peptide,LogFoldChange='value',Sample="AML sample")
+loadUnNormPhosData<-function(){
+  #loads unnormalized phosphoproteomics data
+    require(tidyr)
+    require(dplyr)
+    print("Getting un-corrected phosphosite data")
+  p.pat.phos<-querySynapseTable("syn24227903")%>%
+    mutate(Gene=unlist(Gene))%>%
+    mutate(site=unlist(site))
+  
 
-  soraf.phos<-querySynapseTable("syn22314122")%>%
+#We're still missing the un-normalized version of this data
+  extra.phos<-querySynapseTable("syn24240355")%>%
+    dplyr::select(Gene,site,Peptide,LogFoldChange='value',Sample="AML sample")%>%
+    mutate(Gene=unlist(Gene))%>%
+    mutate(site=unlist(site))
+
+  soraf.phos<-querySynapseTable("syn24228075")%>%
     subset(Treatment=='Vehicle')%>%
     subset(`Cell number`>=10000000)%>%
-    dplyr::select(Gene,site,Peptide,LogFoldChange,Sample="AML sample")%>%distinct()
+    dplyr::select(Gene,site,Peptide,LogFoldChange,Sample="AML sample")%>%distinct()%>%
+      mutate(Gene=unlist(Gene))%>%
+    mutate(site=unlist(site))
 
-  soraf.phos$site<-unlist(soraf.phos$site)
-  soraf.phos$Gene<-unlist(soraf.phos$Gene)
-
-  extra.phos$site <-unlist(extra.phos$site)
-  extra.phos$Gene <-unlist(extra.phos$Gene)
-  pat.phos<<-rbind(pat.phos,unique(extra.phos),soraf.phos)
-  
-  ##getting kinase
-  print('Getting kinase estimates')
-  pat.kin <<-mapPhosphoToKinase(pat.phos)
-
-  
+  pat.phos<<-rbind(p.pat.phos,unique(extra.phos),soraf.phos)
+  return(pat.phos)
 }
 
 #' looadBeatAMLClinicalDrugData
@@ -169,7 +200,7 @@ loadBeatAMLClinicalDrugData<-function(threshold=0.10){
   
   
 getNetworksAndLVs<-function(){
-
+  library(dplyr)
   ##reduce dims
   print("Getting Latent Variables")
   lv.df<-querySynapseTable('syn22274890')
@@ -199,7 +230,8 @@ getNetworksAndLVs<-function(){
 #'analysis code to work
 #'@export
 loadBeatAMLData<-function(){
-  getNetworksAndLVs()
+  require(dplyr)
+  #getNetworksAndLVs()
   loadBeatAMLMolecularData()
   loadBeatAMLClinicalDrugData()
   res<-plotAllPatients(auc.dat,pat.data,pat.phos)
