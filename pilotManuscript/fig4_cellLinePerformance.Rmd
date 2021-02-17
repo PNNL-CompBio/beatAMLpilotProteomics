@@ -8,11 +8,11 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-
+source("../beatAMLdata.R")
 library(amlresistancenetworks)
 library(wesanderson)
 if(!exists('dataLoaded')){
-  amlresistancenetworks::loadBeatAMLData()
+  loadBeatAMLData()
   dataLoaded=TRUE
 }
 

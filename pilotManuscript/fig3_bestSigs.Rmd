@@ -1,7 +1,7 @@
 ---
 title: "Figure 3 Candidates signatures from LOO cross validation"
 author: "Sara Gosline"
-date: "11/13/2020"
+date: "02/08/2021"
 output: html_document
 ---
 
@@ -69,7 +69,8 @@ selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE){
   genes=getFeaturesFromString(genelist,data)
   clusterSingleDrugEfficacy(drugName,method,data,doEnrich=doEnrich,
                               auc.dat=auc.d,auc.thresh=100,
-                            genes,data.mat)%>%subset(p.adjust<0.05)  
+                            genes,data.mat)%>%
+    subset(p.adjust<0.05)  
 }
 
   #reg.preds<<-reg.preds

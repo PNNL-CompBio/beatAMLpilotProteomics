@@ -194,11 +194,39 @@ We compute networks from the combination of both proteomics and phosphoproteomic
 fname=paste0('LASSSO-trametinib-preds')
 print(fname)    
 
-tram.preds%>%
+tr<-tram.preds%>%
   subset(method=='LASSO')%>%
   select(genes,Molecular)
-ph.genelist<-getFeaturesFromString(subset(tram.preds,Molecular=='Phosphosite')$genes,'Phosphosite')
-pr.genelist<-getFeaturesFromString(subset(tram.preds,Molecular=='proteinLevels')$genes,'proteinLevels')
+ph.genelist<-getFeaturesFromString(subset(tr,Molecular=='Phosphosite')$genes,'Phosphosite')
+pr.genelist<-getFeaturesFromString(subset(tr,Molecular=='proteinLevels')$genes,'proteinLevels')
+  
+
+    ##now we need to fix the gene list, since it's not going to match    
+phgenes<-data.frame(genes=ph.genelist)%>%
+  separate(genes, into=c('gene','mod'),sep='-')%>%
+  mutate(modlist=strsplit(mod,split='s|t|y'))%>%
+  apply(1,function(x) paste(x$gene,x$modlist,sep='-'))%>%
+  unlist()%>%unique()
+
+phos.vals<-rep(1.5,length(phgenes))  
+names(phos.vals)<-phgenes
+  
+prot.vals<-rep(1,length(pr.genelist))
+names(prot.vals)<-pr.genelist
+
+het=computePhosphoNetwork(phos.vals,prot.vals,nrand=100,beta=2,fname)
+
+
+##now do the same for logistic
+fname=paste0('Logistic-trametinib-preds')
+print(fname)    
+
+tr.preds<-tram.preds%>%
+  subset(method=='Logistic')%>%
+  select(genes,Molecular)
+
+ph.genelist<-getFeaturesFromString(subset(tr.preds,Molecular=='Phosphosite')$genes,'Phosphosite')
+pr.genelist<-getFeaturesFromString(subset(tr.preds,Molecular=='proteinLevels')$genes,'proteinLevels')
   
 
     ##now we need to fix the gene list, since it's not going to match    
@@ -225,11 +253,11 @@ het=computePhosphoNetwork(phos.vals,prot.vals,nrand=100,beta=2,fname)
 fname=paste0('LASSSO-quizartinib-preds')
 print(fname)    
 
-quiz.preds%>%
+qu.preds<-quiz.preds%>%
   subset(method=='LASSO')%>%
   select(genes,Molecular)
-ph.genelist<-getFeaturesFromString(subset(quiz.preds,Molecular=='Phosphosite')$genes,'Phosphosite')
-pr.genelist<-getFeaturesFromString(subset(quiz.preds,Molecular=='proteinLevels')$genes,'proteinLevels')
+ph.genelist<-getFeaturesFromString(subset(qu.preds,Molecular=='Phosphosite')$genes,'Phosphosite')
+pr.genelist<-getFeaturesFromString(subset(qu.preds,Molecular=='proteinLevels')$genes,'proteinLevels')
   
 
     ##now we need to fix the gene list, since it's not going to match    
@@ -248,3 +276,31 @@ names(prot.vals)<-pr.genelist
 het=computePhosphoNetwork(phos.vals,prot.vals,nrand=100,beta=2,fname)
 #library(PCSF)
 #plot.PCSF(het)
+##logistic preds
+fname=paste0('Logistic-quizartinib-preds')
+print(fname)    
+
+qu.preds<-quiz.preds%>%
+  subset(method=='Logistic')%>%
+  select(genes,Molecular)
+ph.genelist<-getFeaturesFromString(subset(qu.preds,Molecular=='Phosphosite')$genes,'Phosphosite')
+pr.genelist<-getFeaturesFromString(subset(qu.preds,Molecular=='proteinLevels')$genes,'proteinLevels')
+  
+
+    ##now we need to fix the gene list, since it's not going to match    
+phgenes<-data.frame(genes=ph.genelist)%>%
+  separate(genes, into=c('gene','mod'),sep='-')%>%
+  mutate(modlist=strsplit(mod,split='s|t|y'))%>%
+  apply(1,function(x) paste(x$gene,x$modlist,sep='-'))%>%
+  unlist()%>%unique()
+
+phos.vals<-rep(1.5,length(phgenes))  
+names(phos.vals)<-phgenes
+  
+prot.vals<-rep(1,length(pr.genelist))
+names(prot.vals)<-pr.genelist
+
+het=computePhosphoNetwork(phos.vals,prot.vals,nrand=100,beta=2,fname)
+```
+
+That's the end!
