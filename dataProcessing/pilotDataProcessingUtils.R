@@ -260,7 +260,8 @@ getUnNormPhosphoBaselines<-function(){
         dplyr::mutate(Sample=stringr::str_replace(specId,stringr::fixed("."),"-"))%>%
         dplyr::select(Sample,Gene, site,Peptide,LogFoldChange)%>%
       mutate(LogFoldChange=as.numeric(LogFoldChange))%>%
-      mutate(LogFoldChange=tidyr::replace_na(LogFoldChange,0))
+      tidyr::drop_na(LogFoldChange)
+      #mutate(LogFoldChange=tidyr::replace_na(LogFoldChange,0))
 
     synTableStore(patientPhosphoSamples,'BeatAML Pilot Phosphoproteomics Unnormalized')
 
@@ -283,7 +284,8 @@ getNewSorafenibPhospho<-function(){
     dplyr::select(-Entry,ids)%>%
     tidyr::pivot_longer(-c(Gene,site,Peptide),values_to='LogFoldChange',names_to='specIds')%>%
     mutate(LogFoldChange=as.numeric(as.character(LogFoldChange)))%>%
-    mutate(LogFoldChange=tidyr::replace_na(LogFoldChange,0))%>%
+    tidyr::drop_na(LogFoldChange)%>%
+   # mutate(LogFoldChange=tidyr::replace_na(LogFoldChange,0))%>%
     mutate(specimen=stringr::str_replace(specIds,'X',''))%>%
     mutate(specimen=stringr::str_replace(specimen,'\\.','-'))%>%
     left_join(metadata)%>%select(-c(specIds,specimen))%>%distinct()%>%subset(!is.na(`AML sample`))
@@ -302,7 +304,9 @@ getNewComboPhospho<-function(){
     tidyr::pivot_longer(-c(Entry,Gene,site,Peptide,ids),"Sample")%>%
     dplyr::mutate(Barcode=as.numeric(stringr::str_replace(Sample,"X","")))%>%
     dplyr::left_join(metadata,by='Barcode')%>%
-    mutate(value=tidyr::replace_na(value,0))
+  tidyr::drop_na(value)
+  
+   # mutate(value=tidyr::replace_na(value,0))
 
   synTableStore(gilt.sens.pdata,'Drug Combination Phosphoproteomic Unnormalized')
   return(gilt.sens.pdata)

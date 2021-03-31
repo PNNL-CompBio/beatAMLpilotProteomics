@@ -1,7 +1,7 @@
 ---
-title: "Figure 2 Predictor Summary"
+title: "Figure S3 Square Predictor Summary"
 author: "Sara Gosline"
-date: "11/13/2020"
+date: "03/25/2021"
 output: html_document
 ---
 
@@ -14,7 +14,7 @@ pal<-wes_palette('Darjeeling1')
 if(!exists('dataLoaded')){
   source("../beatAMLdata.R")
   loadBeatAMLData()
-  loadUnNormPhosData()  
+ # loadUnNormPhosData()  
   dataLoaded=TRUE
 }
 
@@ -58,10 +58,10 @@ Building the predictors - LASSO and Logistic regression. We build predictosr usi
 
   ##now let's summarize how many predictors we have for each drug
  l.sum.tab<-logr.preds%>%subset(numFeatures>1)%>%
-    group_by(Molecular)%>%summarize(LogisticRegPreds=n_distinct(var), logisticError=mean(MSE),logisticSamples=mean(numSamples,na.rm=T))
+    group_by(Molecular)%>%summarize(LogisticRegPreds=n_distinct(var), logisticError=mean(MSE),logisticSamples=mean(numSamples,na.rm=T),logisticCor=mean(corVal))
   
   sum.tab<-reg.preds%>%subset(numFeatures>1)%>%
-    group_by(Molecular)%>%summarize(LassoRegPreds=n_distinct(var),lassoError=mean(MSE), lassoSamples=mean(numSamples,na.rm=T))%>%
+    group_by(Molecular)%>%summarize(LassoRegPreds=n_distinct(var),lassoError=mean(MSE), lassoSamples=mean(numSamples,na.rm=T),lassoCor=mean(corVal))%>%
     left_join(l.sum.tab)
   knitr::kable(sum.tab)
   write.csv(sum.tab,file='supp_table2_perf.csv')
@@ -83,7 +83,7 @@ library(ggplot2)
 
 p1<-logr.preds%>%subset(numFeatures>0)%>%
  ggplot(aes(y=MSE,x=Molecular,fill=Molecular))+
-          geom_violin(aes(alpha=0.5))+
+          geom_boxplot(aes(alpha=0.5))+
           geom_jitter(aes(color=Molecular,size=numFeatures))+
   scale_color_manual(values=pal)+
   scale_fill_manual(values=pal)+
@@ -92,15 +92,29 @@ print(p1)
 
 p2<-reg.preds%>%subset(numFeatures>0)%>%
  ggplot(aes(y=MSE,x=Molecular,fill=Molecular))+
-          geom_violin(aes(alpha=0.5))+
+          geom_boxplot(aes(alpha=0.5))+
           geom_jitter(aes(color=Molecular,size=numFeatures))+
   scale_color_manual(values=pal)+
   scale_fill_manual(values=pal)+
     ggtitle("LASSO Regression Predictor Performance")
 print(p2)
 
+p3<-reg.preds%>%
+    mutate(Model='LASSO')%>%
+    rbind(mutate(logr.preds,Model='Logistic'))%>%
+  subset(numFeatures>0)%>%
+ggplot(aes(y=corVal,x=Molecular,fill=Molecular))+
+          geom_boxplot(aes(alpha=0.5))+
+          geom_jitter(aes(color=Molecular,size=numFeatures,shape=Model))+
+  scale_color_manual(values=pal)+
+  scale_fill_manual(values=pal)+
+  ggtitle("Total Predictor Correlation")
+print(p3)
+
 ggsave('suppFig2a_logistic.pdf',p1)
 ggsave('suppFig2b_lasso.pdf',p2)
+ggsave('suppFig2_cor.pdf',p3)
+
 ```
 
 

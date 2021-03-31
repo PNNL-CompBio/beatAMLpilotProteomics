@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(amlresistancenetworks)
 
 if(!exists('dataLoaded')){
-  amlresistancenetworks::loadBeatAMLData()
+  source("../loadBeatAMLData.R")
   dataLoaded=TRUE
 }
 

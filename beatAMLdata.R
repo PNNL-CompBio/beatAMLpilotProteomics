@@ -12,9 +12,11 @@ library(amlresistancenetworks)
 #'@import gridExtra
 plotAllPatients<-function(auc.data,pat.data,pphos){
   library(gridExtra)
+  
   numDrugs=auc.data%>%
     group_by(`AML sample`)%>%
     summarize(numDrugs=n_distinct(Condition))
+  
   pat.df<-pat.data%>%
     group_by(`AML sample`)%>%
     summarize(RNA=any(mRNALevels!=0),mutations=any(geneMutations!=0),
@@ -61,8 +63,17 @@ loadBeatAMLMolecularData<-function(){
     mutate(mRNALevels=tidyr::replace_na(mRNALevels,0))%>%
     mutate(geneMutations=tidyr::replace_na(geneMutations,0))%>%
         mutate(binaryMutations=tidyr::replace_na(binaryMutations,0))%>%
- # mutate(countMetric=unlist(countMetric))%>%
+    select(-countMetric)%>%
    distinct()
+  
+  pats.with.prot<<-pat.data%>%
+    group_by(`AML sample`)%>%
+    summarize(hasProt=all(proteinLevels==0))%>%
+    subset(hasProt==FALSE)%>%
+    select('AML sample')
+  
+  pat.data<<-pat.data%>%subset(`AML sample`%in%pats.with.prot$`AML sample`)
+  print(paste('Have',length(unique(pat.data$`AML sample`)),'patients with proteomic data'))
   
   # ###replace values in original table....
    print("Getting site-corrected phosphosite data")
@@ -70,12 +81,10 @@ loadBeatAMLMolecularData<-function(){
      mutate(site=unlist(site))%>%
      mutate(Gene=unlist(Gene))
    
-   
    extra.phos<-querySynapseTable("syn22156814")%>%
      dplyr::select(Gene,site,Peptide,LogFoldChange='value',Sample="AML sample")%>%
     mutate(site=unlist(site))%>%
      mutate(Gene=unlist(Gene))
-   
    
    soraf.phos<-querySynapseTable("syn22314122")%>%
      subset(Treatment=='Vehicle')%>%
@@ -85,12 +94,13 @@ loadBeatAMLMolecularData<-function(){
      mutate(site=unlist(site))%>%
      mutate(Gene=unlist(Gene))
   
-  orig.pat.phos<<-rbind(p.pat.phos,unique(extra.phos),soraf.phos)
+  orig.pat.phos<<-rbind(p.pat.phos,unique(extra.phos),soraf.phos)%>%
+    subset(Sample%in%pats.with.prot$`AML sample`)
   # 
   # ##getting kinase
   # print('Getting kinase estimates')
   # pat.kin <<-mapPhosphoToKinase(pat.phos)
-  pat.phos<<-loadUnNormPhosData()
+  pat.phos<<-loadUnNormPhosData()%>%subset(Sample%in%pats.with.prot$`AML sample`)
   
 }
 
@@ -234,6 +244,7 @@ loadBeatAMLData<-function(){
   #getNetworksAndLVs()
   loadBeatAMLMolecularData()
   loadBeatAMLClinicalDrugData()
+  auc.dat<<-auc.dat%>%subset(`AML sample`%in%pats.with.prot$`AML sample`)
   res<-plotAllPatients(auc.dat,pat.data,pat.phos)
   
   full.pats<<-res%>%

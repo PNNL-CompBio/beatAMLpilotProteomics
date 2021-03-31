@@ -1,5 +1,5 @@
 ---
-title: "Figure 3 Candidates signatures from LOO cross validation"
+title: "Figure 2-3 Candidates signatures from LOO cross validation"
 author: "Sara Gosline"
 date: "02/08/2021"
 output: html_document
@@ -16,8 +16,7 @@ source("../beatAMLdata.R")
 pal<-wes_palette("Darjeeling1")
 if(!exists('dataLoaded')){
   loadBeatAMLData()
-  loadUnNormPhosData()
-
+  #loadUnNormPhosData()
   dataLoaded=TRUE
 }
 

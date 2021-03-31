@@ -1,31 +1,34 @@
 ---
 title: "Figure 1 Data Summary"
 author: "Sara Gosline"
-date: "11/13/2020"
+date: "03/30/2021"
 output: html_document
 ---
 
 ## Get Data
+This calls the standard data loading function that exists at `../beatAMLdata.R`. Once it is loaded it should not have to be reloaded. 
 
 ```{r setup, include=FALSE}
 if(!require(amlresistancenetworks)){
 require(devtools)
 devtools::install_github('sgosline/amlresistancenetworks')
-require(amlresistancenetworks)}
+require(amlresistancenetworks)
+}
 
 knitr::opts_chunk$set(echo = FALSE, warning=FALSE)
 
 
 if(!exists('dataLoaded')){
-  amlresistancenetworks::loadBeatAMLData()
-  dataLoaded=TRUE
+  source("../beatAMLdata.R")
+  loadBeatAMLData()
+    dataLoaded=TRUE
 }
 
 ```
 
 ## Data Summary
 
-The goal fo this markdown is to summarize the BeatAML data that we have so far. Patient summary, summary of AUC value, and general proteomics/protein data. 
+The goal fo this markdown is to summarize the BeatAML data that we have so far. Patient summary, summary of AUC value, and general proteomics/protein data. Here we have the data for
 
 ```{r patient cohort}
   res<-auc.dat%>%select(-c('FLT3-ITD','FLT3-MUT','NPM1'))%>%
