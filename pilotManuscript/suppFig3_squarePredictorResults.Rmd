@@ -111,9 +111,9 @@ ggplot(aes(y=corVal,x=Molecular,fill=Molecular))+
   ggtitle("Total Predictor Correlation")
 print(p3)
 
-ggsave('suppFig2a_logistic.pdf',p1)
-ggsave('suppFig2b_lasso.pdf',p2)
-ggsave('suppFig2_cor.pdf',p3)
+ggsave('suppFig3c_logistic.pdf',p1)
+ggsave('suppFig3b_lasso.pdf',p2)
+ggsave('suppFig3a_cor.pdf',p3)
 
 ```
 

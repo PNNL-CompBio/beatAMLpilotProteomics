@@ -127,8 +127,8 @@ ggplot(aes(y=MSE,x=Molecular,fill=Molecular))+
   ggtitle("LASSO Regression Predictor Performance")
 print(p2)
 
-ggsave('suppfig2cd_logistic.pdf',p1)
-ggsave('suppfig2ab_lasso.pdf',p2)
+ggsave('suppfig2b_logistic.pdf',p1)
+ggsave('suppfig2a_lasso.pdf',p2)
 
 ```
 
