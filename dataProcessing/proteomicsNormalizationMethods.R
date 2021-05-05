@@ -2,9 +2,16 @@
 #' Tools for post-processing global and phospho-proteomics data
 #' Author: Michael Nestor `(michael.nestor@pnnl.gov)`
 #' 
+#' @importFrom dplyr select inner_join group_by_at summarize filter pull
+#' @importFrom tibble rownames_to_column
+#' @importFrom tidyr gather
+#' @importFrom MSnbase exprs pData
 #' 
 #' 
-#' 
+
+library(dplyr)
+library(tibble)
+library(tidyr)
 
 #' @param msnset (MSnSet object) 
 normalizeBySampleMedians <- function(msnset) {
@@ -41,7 +48,7 @@ filterByProportionMissingValues <- function(msnset, least_proportion_threshold =
 #' @param msnset (MSnSet object) 
 #' @param batch_name (character) 
 #' @param least_count_threshold (integer)
-filterByMissingPerBatch <- function(msnset, batch_name, least_count_threshold=2L) {
+filterByMissingPerBatch <- function(msnset, batch_name, least_count_threshold=1L) {
   batch_to_sample <- pData(msnset) %>%
     select(batch_name) %>%
     rownames_to_column("sample_name")
@@ -49,7 +56,7 @@ filterByMissingPerBatch <- function(msnset, batch_name, least_count_threshold=2L
   sufficiently_present_features <- exprs(msnset) %>%
     as.data.frame() %>% 
     rownames_to_column("feature_name") %>%
-    gather(sample_name, abundance, -feature_name) %>%
+    tidyr::gather(sample_name, abundance, -feature_name) %>%
     inner_join(batch_to_sample, by = "sample_name") %>%
     group_by_at(c(batch_name, "feature_name")) %>% 
     summarize(cnt = sum(!is.na(abundance))) %>%
