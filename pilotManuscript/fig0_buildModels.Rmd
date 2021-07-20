@@ -33,21 +33,20 @@ We want to build both the LASSO and logistic regression models using the followi
   print('Now getting gene-based preds')
   logr.preds<-purrr::map_df(list(mRNA='mRNALevels',
                                  protein='proteinLevels',
-                                 gene='geneMutations'),~drugMolLogReg(auc.dat,pat.data,.x,category='Condition'))
+                                gene='geneMutations'),~drugMolLogReg(auc.dat,pat.data,
+                                                             .x,category='Condition'))
   
   reg.preds<-purrr::map_df(list(mRNA='mRNALevels',
                                 protein='proteinLevels',
                                 gene='geneMutations'),~ drugMolRegression(auc.dat,
                                                                           pat.data,
-                                                                          .x,category='Condition'))
+                                                             .x,category='Condition'))
 
   full.results<-rbind(reg.preds,phospho.reg.results)%>%
-    mutate(method='LASSO')%>%rbind(extra.reg.results)
-
+    mutate(method='LASSO')
 
   lr.results<-rbind(logr.preds,phospho.lr.results)%>%
     mutate(method='LogisticReg')%>%
-    rbind(extra.lr.results)%>%
     mutate(MSE=MSE*10000)
   
   #full.results<-rbind(full.results,lr.results)
