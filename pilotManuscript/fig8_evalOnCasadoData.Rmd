@@ -5,9 +5,6 @@ date: "9/14/2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 ## Load Casado  dataset
 ```{r load data}
@@ -27,8 +24,21 @@ pal<-wes_palette('Darjeeling1')
 syn=synapseLogin()
 
 
-cas.auc.dat<-syn$tableQuery('select * from syn26196182')$asDataFrame()
-cas.mol.dat<-syn$tableQuery('select * from syn26196187')$asDataFrame()
+##need to reformat to behave as expected
+cas.auc.dat<-syn$tableQuery('select * from syn26196182')$asDataFrame()%>%
+  rowwise()%>%
+  mutate(Condition=stringr::str_replace_all(compound,'Flt3i \\(midostaurin\\)','Midostaurin'))%>%
+  mutate(Condition=stringr::str_replace_all(Condition,'MEKi \\(trametinib\\)','Trametinib (GSK1120212)'))%>%
+  mutate(Condition=stringr::str_replace_all(Condition,'CK2i \\(silmitasertib\\)','Silimtasertib'))%>%
+  mutate(AUC=sensOverControl*100)%>%
+  dplyr::rename(Sample='sample')#%>%
+  #dplyr::mutate(Sample=unlist(sample))
+
+##need to check drug resutls
+cas.mol.dat<-syn$tableQuery('select * from syn26196187')$asDataFrame()%>%
+  dplyr::rename(Gene='symbol')%>%
+  dplyr::mutate(Sample=unlist(sample))%>%
+  dplyr::rename(proteinLevels='logratio')
 
 ```
 
@@ -36,33 +46,37 @@ cas.mol.dat<-syn$tableQuery('select * from syn26196187')$asDataFrame()
 ## Evaluate model on outside data
 ```{r build model}
 ##now train model on AML and eval on depmap data
-  reg.preds<-purrr::map_df(list(mRNA='mRNALevels',
-                              protein='proteinLevels',
+  reg.preds<-purrr::map_df(list(protein='proteinLevels'),
                             #  gene='geneMutations',
-                               binGene='binaryMutations'),
+                               #binGene='binaryMutations'),
                          ~ drugMolRegressionEval(auc.dat,
                                                  pat.data,
                                                  .x,
-                                                 ctrp.cl.auc,
-                                                 cl.mol.dat,
+                                                 cas.auc.dat,
+                                                 cas.mol.dat,
                                                  category='Condition'))
 
 
-  ##now do the same for Sanger
-##now train model on AML and eval on depmap data
-sang.reg.preds<-purrr::map_df(list(mRNA='mRNALevels',
-                              protein='proteinLevels',
-                         #     gene='geneMutations',
-                               binGene='binaryMutations'),
-                              ~ drugMolRegressionEval(auc.dat,
-                                pat.data,
-                                .x,
-                                sanger.cl.auc,
-                                cl.mol.dat,
-                              category='Condition'))
 
-lreg.preds<-rbind(mutate(reg.preds,dataset='CTRP'),
-                  mutate(sang.reg.preds,dataset='Sanger'))
+  print("Comparing logistic preds")
+  log.reg.preds<-purrr::map_df(list(protein='proteinLevels'),
+                                 # mRNA='mRNALevels',
+                           #   gene='geneMutations',
+                              #binGene='binaryMutations'),
+                             ~ drugMolLogRegEval(auc.dat,
+                                                pat.data,.x,
+                                               cas.auc.dat,
+                                                 cas.mol.dat,
+                                               category='Condition'))
+  
+    #l.sum.tab<-logr.preds%>%subset(numFeatures>1)%>%
+    #group_by(Molecular,dataset)%>%
+    #summarize(Drugs=n_distinct(compound), Error=mean(MSE),`Mean R`=m#ean(corVal,na.rm=T))%>%
+    #mutate(Model='Logistic')
+  
+  sum.tab<-reg.preds%>%
+    mutate(Model='LASSO')%>%
+    rbind(mutate(log.reg.preds,Model='logistic'))
 ```
 
 ## Including Plots
@@ -70,7 +84,4 @@ lreg.preds<-rbind(mutate(reg.preds,dataset='CTRP'),
 You can also embed plots, for example:
 
 ```{r pressure, echo=FALSE}
-plot(pressure)
 ```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

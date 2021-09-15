@@ -24,7 +24,7 @@ plotAllPatients<-function(auc.data,pat.data,pphos){
     right_join(numDrugs)
   
   pat.df<-pphos%>%group_by(`Sample`)%>%summarize(phosphoSites=any(LogFoldChange!=0))%>%
-    rename(`AML sample`='Sample')%>%right_join(pat.df)
+    dplyr::rename(`AML sample`='Sample')%>%right_join(pat.df)
     
   pdf('patientSummaryTab.pdf',height=11)
   grid.table(pat.df)
@@ -44,9 +44,9 @@ loadBeatAMLMolecularData<-function(){
   print("loading molecular data")
   orig.data<-querySynapseTable('syn22172602')
 
-  orig.data<-orig.data%>%rename(proteinLevels='LogFoldChange')%>%
-    rename(mRNALevels='transcriptCounts')%>%
-    rename(geneMutations='Tumor VAF')%>%
+  orig.data<-orig.data%>%dplyr::rename(proteinLevels='LogFoldChange')%>%
+    dplyr::rename(mRNALevels='transcriptCounts')%>%
+    dplyr::rename(geneMutations='Tumor VAF')%>%
     mutate(Gene=unlist(Gene))%>%rowwise()%>%
     mutate(binaryMutations=ifelse(geneMutations==0,0,1))
   
@@ -59,18 +59,18 @@ loadBeatAMLMolecularData<-function(){
     full_join(orig.data,by=c('AML sample','Gene'))%>%
     rowwise()%>%
     mutate(proteinLevels=max(proteinLevels,LogFoldChange,na.rm=T))%>%
-    select(-LogFoldChange)%>%
+    dplyr::select(-LogFoldChange)%>%
     mutate(mRNALevels=tidyr::replace_na(mRNALevels,0))%>%
     mutate(geneMutations=tidyr::replace_na(geneMutations,0))%>%
         mutate(binaryMutations=tidyr::replace_na(binaryMutations,0))%>%
-    select(-countMetric)%>%
+    dplyr::select(-countMetric)%>%
    distinct()
   
   pats.with.prot<<-pat.data%>%
     group_by(`AML sample`)%>%
     summarize(hasProt=all(proteinLevels==0))%>%
     subset(hasProt==FALSE)%>%
-    select('AML sample')
+    dplyr::select('AML sample')
   
   pat.data<<-pat.data%>%subset(`AML sample`%in%pats.with.prot$`AML sample`)
   print(paste('Have',length(unique(pat.data$`AML sample`)),'patients with proteomic data'))
@@ -184,8 +184,8 @@ loadBeatAMLClinicalDrugData<-function(threshold=0.10){
     mutate(percAUC=100*AUC/medAUC)%>%
     ungroup()%>%
     left_join(clin.dat)%>%
-    select(-AUC)%>%
-    rename(AUC='meanAUC')%>%
+    dplyr::select(-AUC)%>%
+    dplyr::rename(AUC='meanAUC')%>%
     left_join(mut.status)
   
     numSens<-auc.dat%>%
@@ -228,10 +228,10 @@ getNetworksAndLVs<-function(){
 #    filter(same)%>%
 #    subset(net2_type=='community')
 #  mut.nets<<-filtered%>%subset(`Hypha 1`=='mutations')%>%
-#    select(Community='Network 2', distance,`AML sample`='Network 1')%>%distinct()
-  prot.nets<<-filtered%>%select(Community='net2',distance,`AML sample`='net1')
+#    dplyr::select(Community='Network 2', distance,`AML sample`='Network 1')%>%distinct()
+  prot.nets<<-filtered%>%dplyr::select(Community='net2',distance,`AML sample`='net1')
     #filtered%>%subset(`Hypha 1`=='proteomics')%>%
-    #select(Community='Network 2', distance,`AML sample`='Network 1')%>%distinct()
+    #dplyr::select(Community='Network 2', distance,`AML sample`='Network 1')%>%distinct()
 }
 
 
@@ -252,6 +252,6 @@ loadBeatAMLData<-function(){
     mutate(fullData=(as.character(RNA)=="TRUE" && as.character(proteins)=="TRUE"
                      && as.character(mutations)=="TRUE" && as.character(phosphoSites)=="TRUE"))%>%
     subset(fullData==TRUE)%>%
-    select(`AML sample`)
+    dplyr::select(`AML sample`)
   
 }
