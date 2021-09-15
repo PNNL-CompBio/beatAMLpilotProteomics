@@ -59,3 +59,8 @@ red.phos<-pat.phos%>%subset(Sample%in%full.pats$`AML sample`)
 
 knitr::kable(res[full.pats$`AML sample`,])
 ```
+
+
+## Data correlations
+
+TODO: We need to create a  figure that describes how the data correlates across modalities. 
