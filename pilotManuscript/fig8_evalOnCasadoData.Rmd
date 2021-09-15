@@ -1,0 +1,76 @@
+---
+title: "Casado Data Comparison"
+author: "Sara Gosline"
+date: "9/14/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Casado  dataset
+```{r load data}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+source("../beatAMLdata.R")
+library(amlresistancenetworks)
+library(wesanderson)
+if(!exists('dataLoaded')){
+  loadBeatAMLData()
+  dataLoaded=TRUE
+}
+
+
+pal<-wes_palette('Darjeeling1')
+syn=synapseLogin()
+
+
+cas.auc.dat<-syn$tableQuery('select * from syn26196182')$asDataFrame()
+cas.mol.dat<-syn$tableQuery('select * from syn26196187')$asDataFrame()
+
+```
+
+
+## Evaluate model on outside data
+```{r build model}
+##now train model on AML and eval on depmap data
+  reg.preds<-purrr::map_df(list(mRNA='mRNALevels',
+                              protein='proteinLevels',
+                            #  gene='geneMutations',
+                               binGene='binaryMutations'),
+                         ~ drugMolRegressionEval(auc.dat,
+                                                 pat.data,
+                                                 .x,
+                                                 ctrp.cl.auc,
+                                                 cl.mol.dat,
+                                                 category='Condition'))
+
+
+  ##now do the same for Sanger
+##now train model on AML and eval on depmap data
+sang.reg.preds<-purrr::map_df(list(mRNA='mRNALevels',
+                              protein='proteinLevels',
+                         #     gene='geneMutations',
+                               binGene='binaryMutations'),
+                              ~ drugMolRegressionEval(auc.dat,
+                                pat.data,
+                                .x,
+                                sanger.cl.auc,
+                                cl.mol.dat,
+                              category='Condition'))
+
+lreg.preds<-rbind(mutate(reg.preds,dataset='CTRP'),
+                  mutate(sang.reg.preds,dataset='Sanger'))
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
