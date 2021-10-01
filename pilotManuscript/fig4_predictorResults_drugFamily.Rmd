@@ -32,28 +32,37 @@ substrate.dat<-pat.phos%>%
 if(file.exists('lassoRegPredsFam.rds')){ 
   reg.preds <- readRDS('lassoRegPredsFam.rds')
 }else{
+
+   phospho.reg.results<-drugMolRegression(auc.dat.fam,substrate.dat,'Phosphosite',category='family')
   
-  print("Getting LASSO preds")
-  phospho.reg.results<-drugMolRegression(auc.dat,substrate.dat,'Phosphosite')
+  print('Now getting gene-based preds')
+  
   reg.preds<-purrr::map_df(list(mRNA='mRNALevels',
                                 protein='proteinLevels',
-                               # gene='geneMutations',
-                                binGene='binaryMutations'),
-                           ~ drugMolRegression(auc.dat,
-                                               pat.data,                                
-                                               .x,
-                                               category='Condition'))%>%
-    rbind(phospho.reg.results)
-  saveRDS(reg.preds,'lassoRegPreds.rds')
+                                gene='geneMutations'),~ drugMolRegression(auc.dat.fam,
+                                                                          pat.data,
+                                                             .x,category='family'))
 
+  full.results<-rbind(reg.preds,phospho.reg.results)%>%
+    mutate(method='LASSO')
+
+
+  #full.results<-rbind(full.results,lr.results)
+  saveRDS(full.results,'lassoRegPredsFam.rds')
+ 
 }
 
-if(file.exists("logRegPredsFam.rds")){
-  logr.preds <- readRDS('logRegPredsFam.rds')
+if(file.exists("logRegPreds.rds")){
+  logr.preds <- readRDS('logRegPreds.rds')
 }else{
   print("Getting Logistic Preds")
   
-  phospho.lr.results<-drugMolLogReg(auc.dat,substrate.dat,'Phosphosite')
+  phospho.lr.results<-drugMolLogReg(auc.dat.fam,substrate.dat,'Phosphosite',category='family')
+
+    logr.preds<-purrr::map_df(list(mRNA='mRNALevels',
+                                 protein='proteinLevels',
+                                gene='geneMutations'),~drugMolLogReg(auc.dat.fam,pat.data,
+                                                             .x,category='family'))
 
   logr.preds<-purrr::map_df(list(binGene='binaryMutations',
                                   mRNA='mRNALevels',
@@ -61,8 +70,14 @@ if(file.exists("logRegPredsFam.rds")){
                                  #    gene='geneMutations'),                                
                             ~ drugMolLogReg(auc.dat,pat.data,.x,category='Condition'))%>%
   rbind(phospho.lr.results)
-  saveRDS(logr.preds,'logRegPreds.rds')
-
+  
+  
+  logr.preds<-logr.preds%>%#rbind(logr.preds,phospho.lr.results)%>%
+    mutate(method='LogisticReg')%>%
+    mutate(MSE=MSE*10000)
+ 
+   saveRDS(logr.preds,'logRegPredsFam.rds')
+  
 }
 
 
