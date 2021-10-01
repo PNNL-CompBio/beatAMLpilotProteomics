@@ -139,7 +139,7 @@ loadUnNormPhosData<-function(){
 #' 100, required to be included
 #' @import dplyr
 #' @import tidyr
-loadBeatAMLClinicalDrugData<-function(threshold=0.10){
+loadBeatAMLClinicalDrugData<-function(threshold=0.10,famThreshold=0.05){
   print("Loading patient variables and drug response")
 
   require(dplyr)
@@ -169,7 +169,7 @@ loadBeatAMLClinicalDrugData<-function(threshold=0.10){
   
   print("Reformating AUC data")
   clin.dat<-pat.drugClin%>%
-    dplyr::select(`AML sample`,gender,ageAtDiagnosis,vitalStatus,overallSurvival,Condition)%>%
+    dplyr::select(`AML sample`,gender,ageAtDiagnosis,vitalStatus,overallSurvival,Condition,family)%>%
     distinct()
   
   auc.dat<- subset(pat.drugClin,Metric%in%c('auc','AUC'))%>%
@@ -192,11 +192,25 @@ loadBeatAMLClinicalDrugData<-function(threshold=0.10){
       group_by(Condition)%>%
       subset(AUC<100)%>%summarize(numSens=n())
     
-    fracSens<-auc.dat%>%group_by(Condition)%>%
+    ##counting sensitivity by family
+    numSensFam <-auc.dat%>%
+      group_by(family)%>%
+      subset(!is.na(family))%>%
+      subset(AUC<100)%>%summarize(numSensFam=n())
+    
+     fracSens<-auc.dat%>%group_by(Condition)%>%
       summarize(nSamps=n())%>%
       left_join(numSens)%>%mutate(fracSens=numSens/nSamps)
+ 
+     ##grouping by family to see if we get more drugs   
+    fracSensFam<-auc.dat%>%
+      subset(!is.na(family))%>%
+      group_by(family)%>%
+      summarize(nSampsFam=n())%>%
+      left_join(numSensFam)%>%mutate(fracSens=numSensFam/nSampsFam)
     
     withSens=subset(fracSens,fracSens>threshold)%>%
+      subset(fracSens<(1-threshold))%>%
       subset(numSens>1)
     include<-union(withSens$Condition,'Gilteritinib (ASP-2215)')
     auc.dat<-subset(auc.dat,Condition%in%include)
@@ -205,6 +219,16 @@ loadBeatAMLClinicalDrugData<-function(threshold=0.10){
     print("Removing drug combinations")
     auc.dat<<-subset(auc.dat,!Condition%in%drug.combos)
   
+    ##add in family sensitivity
+    withSensFam=subset(fracSensFam,fracSens>famThreshold)%>%
+      subset(fracSens<(1-famThreshold))%>%
+      subset(numSensFam>1)
+
+    auc.dat.fam<<-subset(auc.dat,family%in%withSensFam$family)
+    
+#    drug.combos<-unique(auc.dat$Condition[grep(" - |\\+",auc.dat$Condition)])
+#    print("Removing drug combinations")
+#    auc.dat<<-subset(auc.dat,!Condition%in%drug.combos)
   
 }
   

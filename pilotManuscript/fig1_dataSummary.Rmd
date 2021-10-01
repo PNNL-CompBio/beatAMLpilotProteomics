@@ -8,7 +8,7 @@ output: html_document
 ## Get Data
 This calls the standard data loading function that exists at `../beatAMLdata.R`. Once it is loaded it should not have to be reloaded. 
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE,message=FALSE}
 if(!require(amlresistancenetworks)){
 require(devtools)
 devtools::install_github('sgosline/amlresistancenetworks')
@@ -30,9 +30,9 @@ if(!exists('dataLoaded')){
 
 The goal fo this markdown is to summarize the BeatAML data that we have so far. Patient summary, summary of AUC value, and general proteomics/protein data. Here we have the data for
 
-```{r patient cohort}
+```{r patient cohort, message=FALSE}
   res<-auc.dat%>%select(-c('FLT3-ITD','FLT3-MUT','NPM1'))%>%
-    plotAllAUCs(.,'AUC')
+    plotAllAUCs(.,pat.data,drug.metric='AUC',drug.column='Condition')
 
   full.drg<-res%>%
       tibble::rownames_to_column("AML sample")%>%
@@ -60,6 +60,28 @@ red.phos<-pat.phos%>%subset(Sample%in%full.pats$`AML sample`)
 knitr::kable(res[full.pats$`AML sample`,])
 ```
 
+## Drug Family summary
+
+We can also collate information by drug family to increase power. 
+
+
+```{r drug family, message=FALSE}
+  res<-auc.dat.fam%>%select(-c('FLT3-ITD','FLT3-MUT','NPM1'))%>%
+    plotAllAUCs(.,pat.data,drug.metric='AUC',drug.column='family')
+
+  full.drg<-res%>%
+      tibble::rownames_to_column("AML sample")%>%
+      left_join(auc.dat.fam)%>%
+      select(`AML sample`,Drug='family',proteins,RNA,mutations)%>%
+    distinct()%>%
+    group_by(Drug)%>%
+    summarize(`Patients with proteomics`=length(which(proteins==TRUE)),`Patients with mRNA`=length(which(RNA==TRUE)),`Patients with Mutations`=length(which(mutations==TRUE)))
+  
+  knitr::kable(full.drg)
+  write.csv(full.drg,'fam_table1.csv')
+  write.csv(res,'fam_supp_table1.csv')
+
+```
 
 ## Data correlations
 
