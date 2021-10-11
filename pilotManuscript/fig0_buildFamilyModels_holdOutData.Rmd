@@ -24,7 +24,7 @@ We want to build both the LASSO and logistic regression models using the followi
 
 ```{r build models, warning=FALSE, message=FALSE}
 
-all.pats <- intersect(pat.data$`AML sample`,auc.dat$`AML sample`)
+all.pats <- intersect(pat.data$`AML sample`,auc.dat.fam$`AML sample`)
 library(caret)
 folds<-createFolds(all.pats,k=5)
 ##separate out data?
@@ -40,17 +40,19 @@ res<-lapply(folds,function(testpats){
           tr.dat<-subset(substrate.dat,`AML sample`%in%train.pats)
       te.dat<-subset(substrate.dat,`AML sample`%in%test.pats)
       
-    phospho.reg.results<-drugMolRegressionEval(auc.dat,
+    phospho.reg.results<-drugMolRegressionEval(auc.dat.fam,
                                                  tr.dat,
                                                'Phosphosite',
-                                               dplyr::rename(auc.dat,Sample='AML sample'),
-                                               dplyr::rename(te.dat,Sample='AML sample'))%>%
+                                               dplyr::rename(auc.dat.fam,Sample='AML sample'),
+                                               dplyr::rename(te.dat,Sample='AML sample'),
+                                               category='family')%>%
         do.call(rbind,.)
       
     
-    phospho.lr.results<-drugMolLogRegEval(auc.dat,tr.dat,'Phosphosite',
-                                          dplyr::rename(auc.dat,Sample='AML sample'),
-                                           dplyr::rename(te.dat,Sample='AML sample'))%>%
+    phospho.lr.results<-drugMolLogRegEval(auc.dat.fam,tr.dat,'Phosphosite',
+                                          dplyr::rename(auc.dat.fam,Sample='AML sample'),
+                                           dplyr::rename(te.dat,Sample='AML sample'),
+                                          category='family')%>%
       do.call(rbind,.)
   
   print('Now getting gene-based preds')
@@ -62,23 +64,23 @@ res<-lapply(folds,function(testpats){
                               protein='proteinLevels',
                             #  gene='geneMutations',
                                binGene='binaryMutations'),
-                         ~ drugMolRegressionEval(auc.dat,
+                         ~ drugMolRegressionEval(auc.dat.fam,
                             tr.dat,
     .x,
-                                                    dplyr::rename(auc.dat,Sample='AML sample'),
+                                                    dplyr::rename(auc.dat.fam,Sample='AML sample'),
                                                dplyr::rename(te.dat,Sample='AML sample'),
-                                                 category='Condition'))
+                                                 category='family'))
     print("Comparing logistic preds")
   log.reg.preds<-purrr::map_df(list(protein='proteinLevels',
                                   mRNA='mRNALevels',
                            #   gene='geneMutations',
                               binGene='binaryMutations'),
-                             ~ drugMolLogRegEval(auc.dat,
+                             ~ drugMolLogRegEval(auc.dat.fam,
                                                 tr.dat,
                                                 .x,
-                                               dplyr::rename(auc.dat,Sample='AML sample'),
+                                               dplyr::rename(auc.dat.fam,Sample='AML sample'),
                                                dplyr::rename(te.dat,Sample='AML sample'),
-                                              category='Condition'))
+                                              category='family'))
 
 
  
@@ -97,7 +99,7 @@ res<-lapply(folds,function(testpats){
 })
 
 res<-do.call(rbind,res)
-saveRDS(res,'combinedKfoldRes.rds')
+saveRDS(res,'combinedKfoldResFamily.rds')
 ```
 
 Now we have all the data files and ready to go!
@@ -119,11 +121,11 @@ scale_fill_manual(values=pal)
 
 p3
 
-ggsave('5foldCVperformance.pdf',p3)
+ggsave('5foldCVFamilyperformance.pdf',p3)
 
 ```
 
-It seems that the protein data performs well. We can break down by drug as well to see how individual drugs perform.
+It seems that the protein data performs well. We can break down by drug as well to see how individual drug families perform.
 
 ```{r plot drugs, message=F}
 
@@ -136,5 +138,5 @@ scale_fill_manual(values=pal)+coord_flip()
 
 p4
 
-ggsave('5foldCVperformanceByDrug.pdf',p4,height=12)
+ggsave('5foldCVperformanceByDrugFamily.pdf',p4,height=12)
 ```
