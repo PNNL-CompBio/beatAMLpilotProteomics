@@ -3,12 +3,15 @@ title: "Build K-fold models for use"
 author: "Sara Gosline"
 date: "10/10/2021"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 source("../beatAMLdata.R")
 library(amlresistancenetworks)
+library(dplyr)
 ```
 
 ## Load data
@@ -26,31 +29,46 @@ We want to build both the LASSO and logistic regression models using the followi
 
 all.pats <- intersect(pat.data$`AML sample`,auc.dat$`AML sample`)
 library(caret)
+set.seed(117)
 folds<-createFolds(all.pats,k=5)
 ##separate out data?
 
 res<-lapply(folds,function(testpats){
-    test.pats<-all.pats[testpats]
+  test.pats<-all.pats[testpats]
     train.pats<-setdiff(all.pats,test.pats)
 
- print("Phospho preds first")
+  print("Phospho preds first")
   substrate.dat<-pat.phos%>%
     dplyr::select(`AML sample`='Sample',Gene='site',Phosphosite='LogFoldChange')
   
-          tr.dat<-subset(substrate.dat,`AML sample`%in%train.pats)
+      tr.dat<-subset(substrate.dat,`AML sample`%in%train.pats)
       te.dat<-subset(substrate.dat,`AML sample`%in%test.pats)
       
+    print("Working on Phospho LASSO")
     phospho.reg.results<-drugMolRegressionEval(auc.dat,
-                                                 tr.dat,
+                                               tr.dat,
                                                'Phosphosite',
                                                dplyr::rename(auc.dat,Sample='AML sample'),
                                                dplyr::rename(te.dat,Sample='AML sample'))%>%
-        do.call(rbind,.)
-      
+      do.call(rbind,.)
+    ## Dropping "alpha" column from table.
+    phospho.reg.results <- phospho.reg.results[, -1]
     
+    print("Working on Phospho ENet")
+    phospho.enet.results<-drugMolRegressionEval(auc.dat,
+                                                tr.dat,
+                                                'Phosphosite',
+                                                enet.alpha = seq(0.1,0.9,0.1),
+                                                dplyr::rename(auc.dat,Sample='AML sample'),
+                                                dplyr::rename(te.dat,Sample='AML sample'))%>%
+      do.call(rbind,.)
+    ## Dropping "alpha" column from table.
+    phospho.enet.results <- phospho.enet.results[, -1]
+      
+    print("Working on Phospho Logistic")
     phospho.lr.results<-drugMolLogRegEval(auc.dat,tr.dat,'Phosphosite',
                                           dplyr::rename(auc.dat,Sample='AML sample'),
-                                           dplyr::rename(te.dat,Sample='AML sample'))%>%
+                                          dplyr::rename(te.dat,Sample='AML sample'))%>%
       do.call(rbind,.)
   
   print('Now getting gene-based preds')
@@ -58,42 +76,55 @@ res<-lapply(folds,function(testpats){
       tr.dat<-subset(pat.data,`AML sample`%in%train.pats)
       te.dat<-subset(pat.data,`AML sample`%in%test.pats)
     ##now train model on AML and eval on depmap data
+      
+  print("Working on Global LASSO")
   reg.preds<-purrr::map_df(list(mRNA='mRNALevels',
-                              protein='proteinLevels',
-                            #  gene='geneMutations',
-                               binGene='binaryMutations'),
-                         ~ drugMolRegressionEval(auc.dat,
-                            tr.dat,
-    .x,
-                                                    dplyr::rename(auc.dat,Sample='AML sample'),
-                                               dplyr::rename(te.dat,Sample='AML sample'),
-                                                 category='Condition'))
-    print("Comparing logistic preds")
+                                protein='proteinLevels',
+                             #  gene='geneMutations',
+                                binGene='binaryMutations'),
+                           ~ drugMolRegressionEval(auc.dat,tr.dat,.x,
+                                                   dplyr::rename(auc.dat,Sample='AML sample'),
+                                                   dplyr::rename(te.dat,Sample='AML sample'),
+                                                   category='Condition'))
+  reg.preds <- reg.preds[, -1]
+  
+  print("Working on Global ENet")
+  enet.preds<-purrr::map_df(list(mRNA='mRNALevels',
+                                protein='proteinLevels',
+                             #  gene='geneMutations',
+                                binGene='binaryMutations'),
+                           ~ drugMolRegressionEval(auc.dat,tr.dat,.x, enet.alpha = seq(0.1,0.9,0.1),
+                                                   dplyr::rename(auc.dat,Sample='AML sample'),
+                                                   dplyr::rename(te.dat,Sample='AML sample'),
+                                                   category='Condition'))
+  enet.preds <- enet.preds[, -1]
+  
+  print("Working on Global Logistic")
   log.reg.preds<-purrr::map_df(list(protein='proteinLevels',
-                                  mRNA='mRNALevels',
-                           #   gene='geneMutations',
-                              binGene='binaryMutations'),
-                             ~ drugMolLogRegEval(auc.dat,
-                                                tr.dat,
-                                                .x,
-                                               dplyr::rename(auc.dat,Sample='AML sample'),
-                                               dplyr::rename(te.dat,Sample='AML sample'),
-                                              category='Condition'))
+                                    mRNA='mRNALevels',
+                                #   gene='geneMutations',
+                                    binGene='binaryMutations'),
+                               ~ drugMolLogRegEval(auc.dat,tr.dat,.x,
+                                                   dplyr::rename(auc.dat,Sample='AML sample'),
+                                                   dplyr::rename(te.dat,Sample='AML sample'),
+                                                   category='Condition'))
 
-
- 
   full.results<-rbind(reg.preds,phospho.reg.results)%>%
     mutate(method='LASSO')
+  
+  enet.results <- rbind(enet.preds, phospho.enet.results) %>%
+    mutate(method = "ElasticNet")
 
   lr.results<-rbind(log.reg.preds,phospho.lr.results)%>%
     mutate(method='LogisticReg')%>%
     mutate(MSE=MSE*10000)
   
-  #full.results<-rbind(full.results,lr.results)
-  saveRDS(full.results,'lassoRegPreds.rds')
-  saveRDS(lr.results,'logRegPreds.rds')
-#  saveRDS(full.results,'mostlyCompletePredictions.rds')
-  return(rbind(full.results,lr.results))
+  # full.results<-rbind(full.results,lr.results)
+  # saveRDS(full.results,'lassoRegPreds.rds')
+  # saveRDS(lr.results,'logRegPreds.rds')
+  # saveRDS(enet.results, "elasticNetPreds.rds")
+  # saveRDS(full.results,'mostlyCompletePredictions.rds')
+  return(rbind(full.results,lr.results, enet.results))
 })
 
 res<-do.call(rbind,res)
