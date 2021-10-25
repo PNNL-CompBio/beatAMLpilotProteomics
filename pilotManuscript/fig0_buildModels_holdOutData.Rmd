@@ -34,6 +34,7 @@ folds<-createFolds(all.pats,k=5)
 ##separate out data?
 
 res<-lapply(folds,function(testpats){
+  print(testpats)
   test.pats<-all.pats[testpats]
     train.pats<-setdiff(all.pats,test.pats)
 
@@ -109,7 +110,7 @@ res<-lapply(folds,function(testpats){
                                                    dplyr::rename(te.dat,Sample='AML sample'),
                                                    category='Condition'))
 
-  full.results<-rbind(reg.preds,phospho.reg.results)%>%
+  full.results<-rbind(reg.preds, phospho.reg.results)%>%
     mutate(method='LASSO')
   
   enet.results <- rbind(enet.preds, phospho.enet.results) %>%
