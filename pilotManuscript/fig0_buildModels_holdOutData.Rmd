@@ -72,6 +72,7 @@ res<-lapply(folds,function(testpats){
                                           dplyr::rename(te.dat,Sample='AML sample'))%>%
       do.call(rbind,.)
   
+    
   print('Now getting gene-based preds')
   
       tr.dat<-subset(pat.data,`AML sample`%in%train.pats)
