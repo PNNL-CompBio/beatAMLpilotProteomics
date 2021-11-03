@@ -122,7 +122,7 @@ p3<-res%>%
   subset(numFeatures>0)%>%
     ggplot(aes(y=corVal,x=Molecular,fill=Molecular))+
           geom_boxplot(aes(alpha=0.5))+
-          geom_jitter(aes(color=Molecular,size=numFeatures))+
+          geom_jitter(aes(color=Molecular))+
   scale_color_manual(values=pal)+
 scale_fill_manual(values=pal)+facet_grid(~method)
 
@@ -145,5 +145,5 @@ scale_fill_manual(values=pal)+coord_flip()+facet_grid(~method)
 
 p4
 
-ggsave('5foldCVperformanceByDrugFamily.pdf',p4,height=12)
+ggsave('5foldCVperformanceByDrugFamily.pdf',p4,height=12,width=12)
 ```

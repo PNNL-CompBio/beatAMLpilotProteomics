@@ -1,5 +1,5 @@
 ---
-title: "Figure 2-3 Candidates signatures from LOO cross validation"
+title: "Figure 4-5 Candidates signatures from LOO cross validation"
 author: "Sara Gosline"
 date: "02/08/2021"
 output: html_document
@@ -21,8 +21,8 @@ if(!exists('dataLoaded')){
 }
 
 ##assumes figure 2 was already generated!!!!
-reg.preds<-readRDS('lassoRegPreds.rds')
-log.preds<-readRDS('logRegPreds.rds')
+all.preds<-readRDS('combinedKfoldRes.rds')
+#log.preds<-readRDS('logRegPreds.rds')
 
 ```
 
@@ -62,26 +62,21 @@ selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE){
   }
   
   auc.d<-auc.dat%>%
-    dplyr::select(-c(medAUC,percAUC,overallSurvival,ageAtDiagnosis))%>%
+    dplyr::select(-c(medAUC,percAUC,overallSurvival,ageAtDiagnosis,family))%>%
     dplyr::rename(Sample='AML sample')
 
   genes=getFeaturesFromString(genelist,data)
   clusterSingleDrugEfficacy(drugName,method,data,doEnrich=doEnrich,
-                              auc.dat=auc.d,auc.thresh=100,
+                              this.auc.dat=auc.d,auc.thresh=100,
                             genes,data.mat)%>%
     subset(p.adjust<0.05)  
 }
 
   #reg.preds<<-reg.preds
-  new.results<-reg.preds%>%subset(numFeatures>2)%>%#subset(MSE<1500)%>%  
-    mutate(method='LASSO',doEnrich=TRUE)%>%
-    dplyr::rename(genelist='genes')%>%
-   rowwise()%>%
-    mutate(enrich=paste(selectDataMatAndPlot(var,method,Molecular,genelist,doEnrich)$Description,collapse=','))%>%
-    rowwise()%>%
-    mutate(features=paste(getFeaturesFromString(genelist,Molecular),collapse=','))%>%
-    dplyr::select(Drug='var',MSE,features,dataType='Molecular',enrich)%>%
-    arrange(MSE)
+  gene.vals<-all.preds%>%
+        select(-c(MSE,testMSE,corVal,numFeatures,numSamples))%>%
+      rowwise()%>%
+      mutate(genelist=getFeaturesFromString(genes,Molecular))
 
   
   knitr::kable(new.results)
@@ -91,25 +86,5 @@ selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE){
 
 You can also embed plots, for example:
 
-```{r logr preds, echo=FALSE, warning=FALSE}
-
-  other.results<-log.preds%>%subset(numFeatures>2)%>%#subset(MSE<0.21)%>%  
-    mutate(method='LogisticRegression',doEnrich=TRUE)%>%
-    dplyr::rename(genelist='genes')%>%
-   rowwise()%>%
-   mutate(enrich=paste(selectDataMatAndPlot(var,method,Molecular,genelist,doEnrich)$Description,collapse=','))%>%
-    rowwise()%>%
-    mutate(features=paste(getFeaturesFromString(genelist,Molecular),collapse=','))%>%
-    dplyr::select(Drug='var',MSE,features,dataType='Molecular',enrich)%>%
-  arrange(MSE)
-
-
-knitr::kable(other.results)
-full.results<-rbind(mutate(new.results,Model='LASSO'),
-                    mutate(other.results,Model='Logistic'))
-
-write.csv(full.results,'supp_table2 _allSigs.csv')
-
-```
 
 
