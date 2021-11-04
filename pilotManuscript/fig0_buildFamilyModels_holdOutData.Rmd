@@ -29,10 +29,12 @@ We want to build both the LASSO and logistic regression models using the followi
 
 all.pats <- intersect(pat.data$`AML sample`,auc.dat.fam$`AML sample`)
 library(caret)
+set.seed(117117)
 folds<-createFolds(all.pats,k=5)
 ##separate out data?
 
 res<-lapply(folds,function(testpats){
+  print(testpats)
     test.pats<-all.pats[testpats]
     train.pats<-setdiff(all.pats,test.pats)
 
@@ -88,6 +90,9 @@ res<-lapply(folds,function(testpats){
  
   full.results<-reg.preds%>%
     mutate(method='LASSO')
+  
+  enet.results <- rbind(enet.preds, phospho.enet.results) %>%
+    mutate(method = "ElasticNet")
 
   lr.results<-log.reg.preds%>%
     mutate(method='LogisticReg')%>%
