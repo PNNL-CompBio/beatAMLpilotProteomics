@@ -15,22 +15,10 @@ library(dplyr)
 library(tidyr)
 
 ##assumes figure 2 was already generated!!!!
-reg.preds<-readRDS('lassoRegPreds.rds')%>%
-  subset(var%in%c("Quizartinib (AC220)","Trametinib (GSK1120212)"))%>%
-  subset(Molecular%in%c('proteinLevels','Phosphosite'))%>%mutate(method='LASSO')
-log.preds<-readRDS('logRegPreds.rds')%>%
-   subset(var%in%c("Quizartinib (AC220)","Trametinib (GSK1120212)"))%>%
-    subset(Molecular%in%c('proteinLevels','Phosphosite'))%>%mutate(method='Logistic')
+full.preds<-readRDS('combinedKfoldRes.rds')%>%
+  subset(compound%in%c("Quizartinib (AC220)","Trametinib (GSK1120212)"))%>%
+  subset(Molecular%in%c('proteinLevels','Phosphosite'))
 
-#cl.reg.preds<-readRDS('cellLinelassoRegPreds.rds')%>%
-#    subset(compound%in%c("Quizartinib (AC220)","Trametinib (GSK1120212)"))%>%
-#    subset(Molecular%in%c('proteinLevels'))%>%mutate(method='CellLine_LASSO')
-
-#cl.lr.preds<-readRDS('cellLinelogRegPreds.rds')%>%
-#    subset(compound%in%c("Quizartinib (AC220)","Trametinib (GSK1120212)"))%>%
-#    subset(Molecular%in%c('proteinLevels'))%>%mutate(method='CellLine_Logistic')
-
-full.preds<-rbind(reg.preds,log.preds)
 
 #cl.preds<-rbind(cl.reg.preds,cl.lr.preds)
 
