@@ -184,7 +184,6 @@ selectDataMatAndPlot<-function(drugName,method,data,genes,doEnrich=FALSE,doGraph
   
   write.csv(new.results,'selectDRugsGOenrichment.csv')
   
-  
 ```
 
 ### Network analysis
@@ -195,9 +194,9 @@ Next we take the top-performing signatures for the two drugs of interest (tramet
 plotGraphOnData<-function(df,fname){
   print(fname)
   dtypes<-df$DataType
+  
   genelist<-lapply(dtypes,function(x)
     unlist(strsplit(subset(df,DataType==x)$genelists,';')))
-  
   
   allgenes<-unlist(genelist)
   
