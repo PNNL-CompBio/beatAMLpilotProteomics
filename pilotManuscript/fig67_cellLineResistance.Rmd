@@ -15,7 +15,8 @@ library(dplyr)
 library(tidyr)
 
 ##assumes figure 2 was already generated!!!!
-full.preds<-readRDS('combinedKfoldRes.rds')%>%
+syn<-synapseLogin()
+full.preds<-readRDS(syn$get('syn26529376')$path)%>%#readRDS('combinedKfoldRes.rds')%>%
   subset(compound%in%c("Quizartinib (AC220)","Trametinib (GSK1120212)"))%>%
   subset(Molecular%in%c('proteinLevels','Phosphosite'))
 
@@ -29,13 +30,12 @@ pal<-wes_palette('Darjeeling1',100,type='continuous')
 
 As AML cells become resistant to drugs they undergo genetic, transcriptomic and proteomic changes that give rise to drug resistance. We have cultured two cell lines in the presence of Trametinib and Quizartinib and can evaluate the patient-derived signatures in these cell lines.
 
-
-
 ```{r collect cell line data, echo=FALSE,warning=FALSE}
 tramProtData<-amlresistancenetworks::querySynapseTable('syn22986326')%>%
   subset(!is.nan(LogRatio))%>%
   mutate(Gene=unlist(Gene))%>%
-  mutate(Molecular='proteinLevels')#%>%
+  mutate(Molecular='proteinLevels')%>%
+  subset(Batch=='Experiment 1')#%>%
 #  subset(!sample%in%c('M13_PAR_01','M13_PAR_02','M13_PAR_03'))
  
 tramPhosData<-amlresistancenetworks::querySynapseTable('syn24389738')%>%
@@ -43,21 +43,20 @@ tramPhosData<-amlresistancenetworks::querySynapseTable('syn24389738')%>%
   subset(!is.nan(LogRatio))%>%
   mutate(Gene=unlist(Gene))%>%
   mutate(site=unlist(site))%>%
-  mutate(Molecular='Phosphosite')#%>%
+  mutate(Molecular='Phosphosite')%>%
+  subset(Batch=='Experiment 1')
  # subset(!sample%in%c('M13_PAR_01','M13_PAR_02','M13_PAR_03'))
 
 full.tram.prot<-tramPhosData%>%
   dplyr::select(Gene='site',LogRatio,sample,CellType,Molecular,Treatment)%>%
   rbind(dplyr::select(tramProtData,c(Gene,LogRatio,sample,CellType,Molecular,Treatment)))
 
-
-
 quizProtData<-amlresistancenetworks::querySynapseTable('syn23595222')%>%
   subset(!is.nan(value))%>%
   mutate(Gene=unlist(Gene))%>%
   mutate(Molecular='proteinLevels')
- syn<-synapseLogin()
- 
+
+
 #quizPhosData<-syn$tableQuery('select * from syn24331593')$asDataFrame()   
 quizPhosData<-amlresistancenetworks::querySynapseTable("syn24366514")%>%
   subset(!is.nan(value))%>%
@@ -80,11 +79,13 @@ full.quiz.prot<-quizPhosData%>%
 spreadAndSelect<-function(df,genes,mol, method,var){
   library(pheatmap)
   fname=paste0(method,'_preds_of_',var,'_with_',mol,'.pdf')
-  print(fname)
-  genelist<-getFeaturesFromString(genes,mol)
-  #print(genelist)
+ # print(fname)
+  genelist<-getFeaturesFromString(genes,mol)%>%unlist()
+  if(length(genelist)<3)
+    return(fname)
+#print(genelist)
   sdf<-subset(df,Molecular==mol)
-  #print(sdf)
+#  print(sdf)
   mat<-sdf%>%
     select(Gene,LogRatio,sample)%>%
     replace_na(list(LogRatio=0.0))%>%
@@ -92,13 +93,13 @@ spreadAndSelect<-function(df,genes,mol, method,var){
     tidyr::pivot_wider(values_from=LogRatio,names_from=sample,
                         values_fn=list(LogRatio=sum),values_fill=list(LogRatio=0.0))%>%
     tibble::column_to_rownames('Gene')
-  #print(dim(mat))
+ # print(dim(mat))
   annotes<-sdf%>%
     select(CellType,sample)%>%distinct()%>%
     tibble::column_to_rownames('sample')
   annote.colors<-list(CellType=wes_palette('Darjeeling2',length(unique(sdf$CellType))))
   names(annote.colors$CellType)<-unique(sdf$CellType)
-  #print(annotes)
+#  print(annotes)
   pheatmap(mat,annotation_col=annotes, cellheight=10,cellwidth=10,
            filename=fname,clustering_method='ward.D2',annotation_colors = annote.colors, 
            clustering_distance_cols = 'euclidean', clustering_distance_rows='euclidean',color=pal)
@@ -127,7 +128,8 @@ scatterPlot<-function(df,genes,mol,method,var){
 
 
 ```{r trametinib, echo=FALSE, warning=FALSE}
-tram.preds<-subset(full.preds,var=="Trametinib (GSK1120212)")
+tram.preds<-subset(full.preds,compound=="Trametinib (GSK1120212)")%>%
+  mutate(var='Trametinib')
 
 pred.plots<-tram.preds%>%subset(numFeatures>0)%>%
   mutate(df=list(tibble::remove_rownames(full.tram.prot)))%>%
@@ -143,7 +145,7 @@ red.pred.plots<-tram.preds%>%subset(numFeatures>0)%>%
   dplyr::rename(mol='Molecular')%>%
   mutate(method=paste0('red',method))%>%
   rowwise()%>%
-  mutate(plotfile=spreadAndSelect(df,genes,mol,method,var))#%>%
+  mutate(plotfile=spreadAndSelect(df,genes,mol,method,compound))#%>%
  # mutate(scatter=scatterPlot(df,genes,mol,method,var))
 
 ```
@@ -152,10 +154,12 @@ red.pred.plots<-tram.preds%>%subset(numFeatures>0)%>%
 ## Quizartinib Analysis
 
 ```{r quizartinib, echo=FALSE, warning=FALSE}
-quiz.preds<-subset(full.preds,var=="Quizartinib (AC220)")
+quiz.preds<-subset(full.preds,compound=="Quizartinib (AC220)")%>%
+  mutate(var='Quizartinib')
+
 pred.plots<-quiz.preds%>%subset(numFeatures>0)%>%
   mutate(df=list(tibble::remove_rownames(full.quiz.prot)))%>%
-  rename(mol=Molecular)%>%
+  rename(mol='Molecular')%>%
   rowwise()%>%
   mutate(plotfile=spreadAndSelect(df,genes,mol,method,var))
 
@@ -164,7 +168,7 @@ red.quiz.prot<-full.quiz.prot%>%
 
 red.pred.plots<-quiz.preds%>%subset(numFeatures>0)%>%
   mutate(df=list(tibble::remove_rownames(red.quiz.prot)))%>%
-  rename(mol=Molecular)%>%
+  rename(mol='Molecular')%>%
   mutate(method=paste0('red',method))%>%
   rowwise()%>%
   mutate(plotfile=spreadAndSelect(df,genes,mol,method,var))#%>%

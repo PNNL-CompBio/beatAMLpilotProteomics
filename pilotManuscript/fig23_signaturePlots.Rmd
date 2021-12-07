@@ -27,83 +27,24 @@ Now let's load the full models to assess signatures
 
 ```{r build sigs,warning=F,message=F}
 
+ ##lets load up original preds too
+  #eval.preds<-readRDS('combinedKfoldRes.rds')
+  
+##get file from synapse
+syn<-amlresistancenetworks::synapseLogin()
+eval.preds<-readRDS(syn$get('syn26529375')$path)
+all.preds<-readRDS(syn$get('syn26529376')$path)
+
 tr.dat<- pat.data%>%
-  left_join(rename(pat.phos,`AML sample`='Sample',Phosphosite='LogFoldChange'))
-
-
-##lets load up original preds too
-eval.preds<-readRDS('combinedKfoldRes.rds')
-
-if(file.exists('combinedPreds.rds')){
-  all.preds<-readRDS('combinedPreds.rds')
-}else{
-  eval.list<-list(
-    combo=list(mf=c('Gene','Gene','Gene','site'),
-               fn=c('mRNALevels','proteinLevels','binaryMutations','Phosphosite')),
-    mRNA=c('Gene','mRNALevels'),
-    prot=c("Gene","proteinLevels"),
-    mut=c('Gene','binaryMutations'),
-    phosph=c('site','Phosphosite'))
-
-  
-  message('Running lasso')
-    ##now train model on AML and eval on depmap data
-  reg.preds<-purrr::map_df(eval.list,
-                         ~ amlresistancenetworks::drugMolRegression(auc.dat,
-                            tr.dat,
-                            mol.feature=.x[1],
-                            mol.feature.name=.x[2],                                                   
-                                                 category='Condition'))
+    left_join(rename(pat.phos,`AML sample`='Sample',Phosphosite='LogFoldChange'))
   
   
-    message("Comparing logistic preds")
-  
-    log.reg.preds<-purrr::map_df(eval.list,
-                             ~ drugMolLogReg(auc.dat,
-                                                tr.dat,
-                                               mol.feature=.x[1],
-                                                            mol.feature.name=.x[2],
-                                              category='Condition'))
-
-        message("Running elastic net")
-
-  
-  enet.reg.preds<-purrr::map_df(eval.list,
-                         ~ drugMolRegression(auc.dat,
-                            tr.dat,
-                             mol.feature=.x[1],
-                                mol.feature.name=.x[2],
-                                                 category='Condition',doEnet=TRUE))
-  
-  
-  
-  e.results<-enet.reg.preds%>%
-    mutate(method='ElasticNet')
- 
-  full.results<-reg.preds%>%
-    mutate(method='LASSO')
-
-  lr.results<-log.reg.preds%>%
-    mutate(method='LogisticReg')%>%
-    mutate(MSE=MSE*10000)
-  
-  #full.results<-rbind(full.results,lr.results)
-  saveRDS(full.results,'fulllassoRegPreds.rds')
-  saveRDS(lr.results,'fulllogRegPreds.rds')
-  saveRDS(e.results,'fullenetRegPreds.rds')
-#  saveRDS(full.results,'mostlyCompletePredictions.rds')
-  
-  all.preds<-rbind(full.results,lr.results,e.results)
-  #all.preds<-rbind(enet.preds,log.preds,reg.preds)
-  saveRDS(all.preds,'combinedPreds.rds')
-  }
-
 ```
 
 ## Evaluate Functional role of the signatures
 
 
-Given the diversity of signatures otbtained from the predictive models, we use the signatures from the complete models and the performance from K-means validation to identify specific gene signatures. 
+Given the diversity of signatures obtained from the predictive models, we use the signatures from the complete models and the performance from K-means validation to identify specific gene signatures. 
 
 ```{r lasso preds,warning=FALSE,echo=FALSE}
 
