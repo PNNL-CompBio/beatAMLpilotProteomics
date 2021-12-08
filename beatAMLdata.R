@@ -13,9 +13,9 @@ library(amlresistancenetworks)
 plotAllPatients<-function(auc.data,pat.data,pphos){
   library(gridExtra)
   
-  numDrugs=auc.data%>%
+  numDrugs = auc.data%>%
     group_by(`AML sample`)%>%
-    summarize(numDrugs=n_distinct(Condition))
+    summarize(numDrugs = n_distinct(Condition))
   
   pat.df<-pat.data%>%
     group_by(`AML sample`)%>%

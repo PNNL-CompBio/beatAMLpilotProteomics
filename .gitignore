@@ -10,6 +10,7 @@ Ex10_proteomics/data
 */*.html
 */*.csv
 */*.rds
+*/*.gml
 # Session Data files
 .RData
 

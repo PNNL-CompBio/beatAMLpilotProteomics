@@ -78,19 +78,68 @@ Just to be sure we are getting the most out of the patient data we can then buil
 
 ```{r build predictors, echo=FALSE,warning=FALSE}
 
+
+print("Comparing Elastic Net preds")
+if(file.exists('cellLineElasticRegPreds.rds')){
+  enet.reg.preds<-readRDS('cellLineElasticRegPreds.rds')
+
+}else{
+  
+    eval.list<-list(
+    combo=list(mf=c('Gene','Gene','Gene'),
+              fn=c('mRNALevels','proteinLevels','binaryMutations')),
+    mRNA=c('Gene','mRNALevels'),
+    prot=c("Gene","proteinLevels"),
+    mut=c('Gene','binaryMutations'))
+   # phosph=c('site','Phosphosite'))
+
+  ##now train model on AML and eval on depmap data
+  enet.reg.preds<-purrr::map_df(eval.list,
+                         ~ drugMolRegressionEval(auc.dat,
+                                                 pat.data,
+                                                   mol.feature=.x[1],
+                            mol.feature.name=.x[2],   
+                                                 ctrp.cl.auc,
+                                                 cl.mol.dat,
+                                                 category='Condition',doEnet=TRUE))
+
+
+  ##now do the same for Sanger
+##now train model on AML and eval on depmap data
+enet.sang.reg.preds<-purrr::map_df(eval.list,
+                              ~ drugMolRegressionEval(auc.dat,
+                                pat.data,
+                                  mol.feature=.x[1],
+                            mol.feature.name=.x[2],   
+                                sanger.cl.auc,
+                                cl.mol.dat,
+                              category='Condition'))
+
+enet.reg.preds<-rbind(mutate(enet.reg.preds,dataset='CTRP'),
+                  mutate(enet.sang.reg.preds,dataset='Sanger'))
+saveRDS(enet.reg.preds,'cellLineElasticRegPreds.rds')
+}
+
 print("Comparing LASSO preds")
 if(file.exists('cellLinelassoRegPreds.rds')){
   lreg.preds<-readRDS('cellLinelassoRegPreds.rds')
 
 }else{
+  
+    eval.list<-list(
+    combo=list(mf=c('Gene','Gene','Gene'),
+              fn=c('mRNALevels','proteinLevels','binaryMutations')),
+    mRNA=c('Gene','mRNALevels'),
+    prot=c("Gene","proteinLevels"),
+    mut=c('Gene','binaryMutations'))
+   # phosph=c('site','Phosphosite'))
+
   ##now train model on AML and eval on depmap data
-  reg.preds<-purrr::map_df(list(mRNA='mRNALevels',
-                              protein='proteinLevels',
-                            #  gene='geneMutations',
-                               binGene='binaryMutations'),
+  reg.preds<-purrr::map_df(eval.list,
                          ~ drugMolRegressionEval(auc.dat,
                                                  pat.data,
-                                                 .x,
+                                                   mol.feature=.x[1],
+                            mol.feature.name=.x[2],   
                                                  ctrp.cl.auc,
                                                  cl.mol.dat,
                                                  category='Condition'))
@@ -98,13 +147,11 @@ if(file.exists('cellLinelassoRegPreds.rds')){
 
   ##now do the same for Sanger
 ##now train model on AML and eval on depmap data
-sang.reg.preds<-purrr::map_df(list(mRNA='mRNALevels',
-                              protein='proteinLevels',
-                         #     gene='geneMutations',
-                               binGene='binaryMutations'),
+sang.reg.preds<-purrr::map_df(eval.list,
                               ~ drugMolRegressionEval(auc.dat,
                                 pat.data,
-                                .x,
+                                  mol.feature=.x[1],
+                            mol.feature.name=.x[2],   
                                 sanger.cl.auc,
                                 cl.mol.dat,
                               category='Condition'))
@@ -120,25 +167,21 @@ if(file.exists('cellLinelogRegPreds.rds')){
   
   
   print("Comparing logistic preds")
-  log.reg.preds<-purrr::map_df(list(protein='proteinLevels',
-                                  mRNA='mRNALevels',
-                           #   gene='geneMutations',
-                              binGene='binaryMutations'),
+  log.reg.preds<-purrr::map_df(eval.list,
                              ~ drugMolLogRegEval(auc.dat,
                                                 pat.data,
-                                                .x,
+                                                  mol.feature=.x[1],
+                                        mol.feature.name=.x[2],   
                                                ctrp.cl.auc,
                                                cl.mol.dat,
                                                category='Condition'))
 
 
-  sang.log.reg.preds<-purrr::map_df(list(protein='proteinLevels',
-                                  mRNA='mRNALevels',
-                         #         gene='geneMutations',
-                               binGene='binaryMutations'),
+  sang.log.reg.preds<-purrr::map_df(eval.list,
                                   ~drugMolLogRegEval(auc.dat,
                                                     pat.data,
-                                                    .x,
+                                                      mol.feature=.x[1],
+                                          mol.feature.name=.x[2],   
                                                     sanger.cl.auc,
                                                     cl.mol.dat,
                                                     category='Condition'))
@@ -158,11 +201,17 @@ logr.preds<-rbind(mutate(log.reg.preds,dataset='CTRP'),
     summarize(Drugs=n_distinct(compound), Error=mean(MSE),`Mean R`=mean(corVal,na.rm=T))%>%
     mutate(Model='Logistic')
   
+  enet.tab<-enet.reg.preds%>%subset(numFeatures>1)%>%
+    group_by(Molecular,dataset)%>%
+    summarize(Drugs=n_distinct(compound),Error=mean(MSE),`Mean R`=mean(corVal,na.rm=T))%>%
+    mutate(Model='Elastic')
+  
   sum.tab<-lreg.preds%>%subset(numFeatures>1)%>%
     group_by(Molecular,dataset)%>%
     summarize(Drugs=n_distinct(compound),Error=mean(MSE),`Mean R`=mean(corVal,na.rm=T))%>%
     mutate(Model='LASSO')%>%
-    rbind(l.sum.tab)
+    rbind(l.sum.tab)%>%
+    rbind(enet.tab)
   
   knitr::kable(sum.tab)
   write.csv(sum.tab,file='table3_cellLineperf.csv')
@@ -198,21 +247,33 @@ scale_fill_manual(values=pal)+
   ggtitle("LASSO Cell Line Regression Predictor Performance")
 print(p2)
 
-p3<-logr.preds%>%mutate(Model='Logistic')%>%
-  rbind(mutate(lreg.preds,Model='LASSO'))%>%
-  subset(numFeatures>0)%>%
-    ggplot(aes(y=corVal,x=Molecular,fill=Molecular))+
+p4<-enet.reg.preds%>%subset(numFeatures>0)%>%
+  ggplot(aes(y=MSE,x=Molecular,fill=Molecular))+
           geom_boxplot(aes(alpha=0.5))+
-          geom_jitter(aes(color=Molecular,size=numFeatures,shape=Model))+
+          geom_jitter(aes(color=Molecular,size=numFeatures))+
   scale_color_manual(values=pal)+
 scale_fill_manual(values=pal)+
   facet_grid(~dataset)+
+  ggtitle("ElasticNet Cell Line Regression Predictor Performance")
+print(p4)
+
+p3<-logr.preds%>%mutate(Model='Logistic')%>%
+  rbind(mutate(lreg.preds,Model='LASSO'))%>%
+  rbind(mutate(enet.reg.preds,Model='Elastic'))%>%
+  subset(numFeatures>0)%>%
+    ggplot(aes(y=corVal,x=Molecular,fill=Molecular))+
+          geom_boxplot(aes(alpha=0.5))+
+          geom_jitter(aes(color=Molecular))+
+  scale_color_manual(values=pal)+
+scale_fill_manual(values=pal)+
+  facet_grid(Model~dataset)+
     ggtitle("Combined Cell Line Predictor Performance")
 
 
 print(p3)
 ggsave('fig4a_cl_logistic.pdf',p1)
 ggsave('fig4b_cl_lasso.pdf',p2)
+ggsave('fig4c_cl_enet.pdf',p2)
 ggsave('fig4_cl_full.pdf',p3)
 
 

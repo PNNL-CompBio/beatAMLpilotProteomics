@@ -100,6 +100,7 @@ how well do these samples correlate across all samples?
 ```{r, prot cors,warning=FALSE,message=FALSE}
 
 library(dplyr)
+library(ggplot2)
 mp<-combined%>%
   dplyr::select('AML sample','proteinLevels','mRNALevels','Gene')%>%
   distinct()%>%
@@ -109,13 +110,17 @@ mp<-combined%>%
 
 DT::datatable(mp)
 
+meancor=mean(mp$corval)
+
 mpp<-combined%>%
   dplyr::select('AML sample','proteinLevels','mRNALevels','Gene','binaryMutations')%>%
   distinct()%>%
   subset(mRNALevels>1)%>%
   subset(proteinLevels!=0)%>%
   mutate(mRNALevels=log10(0.01+mRNALevels))%>%
-  ggplot(aes(x=mRNALevels,y=proteinLevels,col=`AML sample`,shape=as.factor(binaryMutations)))+geom_point()+scale_color_viridis_d()+ggtitle('mRNA/Protein correlation')
+  ggplot(aes(x=mRNALevels,y=proteinLevels,col=`AML sample`,shape=as.factor(binaryMutations)))+geom_point()+scale_color_viridis_d()+ggtitle(paste0('mRNA/Protein correlation: ',meancor))
+
+ggsave('protMrnaCor.pdf',mpp)
 
 
 ```
@@ -134,6 +139,7 @@ mp<-combined%>%
   summarize(corval=cor(proteinLevels,Phosphosite,method='spearman',use='pairwise.complete.obs'))
 
 DT::datatable(mp)
+meancor=mean(mp$corval)
 
 mpp<-combined%>%
   dplyr::select('AML sample','proteinLevels','Phosphosite','Gene','binaryMutations')%>%
@@ -141,7 +147,9 @@ mpp<-combined%>%
  # subset(mRNALevels>1)%>%
   subset(proteinLevels!=0)%>%
 #  mutate(mRNALevels=log10(0.01+mRNALevels))%>%
-  ggplot(aes(x=Phosphosite,y=proteinLevels,col=`AML sample`,shape=as.factor(binaryMutations)))+geom_point()+scale_color_viridis_d()+ggtitle('Protein/phosphosite correlation')
+  ggplot(aes(x=Phosphosite,y=proteinLevels,col=`AML sample`,shape=as.factor(binaryMutations)))+geom_point()+scale_color_viridis_d()+ggtitle(paste0('Protein/phosphosite correlation: ',meancor))
+
+ggsave('protPhosho.pdf',mpp)
 
 
 ```

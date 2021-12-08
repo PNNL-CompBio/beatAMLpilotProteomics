@@ -1,0 +1,43 @@
+on:
+  push:
+    paths:
+      - pilotManuscript/s*Rmd
+      - .github/workfows/*
+
+name: render-RMDs
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    env:
+      SYNAPSE_AUTH_TOKEN: ${{ secrets.SYNAPSE_AUTH_TOKEN }}
+      GITHUB_PAT: ${{ secrets.PAT }}
+    steps:
+     - uses: actions/checkout@v2
+     - uses: r-lib/actions/setup-r@v1
+     - uses: r-lib/actions/setup-pandoc@v1
+     - uses: r-lib/actions/setup-tinytex@v1
+     - name: Install Python dependencies
+       run: |
+          sudo apt-get update
+          sudo apt-get upgrade
+          sudo apt-get install python3-virtualenv
+          sudo apt-get install python3-venv
+          sudo apt-get install libcurl4-openssl-dev
+       shell: /bin/bash {0}
+     - name: Install synapse client
+       run: |
+         pip install testresources
+         pip install pandas
+         pip install synapseclient
+     - name: Install R packages
+       run: Rscript -e 'source("loadPackages.R")'
+     - name: Render my document to all types
+       run: Rscript -e 'for(file in list.files("pilotManuscript/",pattern="*Rmd")) try(rmarkdown::render(paste0("pilotManuscript/",file)))'
+     - name: Store on synapse
+       run: |
+               for file in pilotManuscript/*html
+               do 
+               synapse store $file --parentId syn26529364
+               done
+           
