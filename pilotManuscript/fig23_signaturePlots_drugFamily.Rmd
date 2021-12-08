@@ -21,8 +21,10 @@ if(!exists('dataLoaded')){
 }
 
 ##assumes figure 2 was already generated!!!!
-reg.preds<-readRDS('lassoRegPredsFam.rds')
-log.preds<-readRDS('logRegPredsFam.rds')
+syn<-synapseLogin()
+all.preds<-readRDS(syn$get('')$path)
+#reg.preds<-subset(all.preds,)
+#log.preds<-readRDS('logRegPredsFam.rds')
 
 ```
 
