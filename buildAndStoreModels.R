@@ -7,7 +7,7 @@
 #We want to build both the LASSO and logistic regression models using the following code. This code will divide the patients into 5 batches and train/test the model holding out 1/5 of the data each time. Then we will have predictions on each of the samples. 
 
 library(amlresistancenetworks)
-source("../beatAMLdata.R")
+source("beatAMLdata.R")
 
 if(!exists('dataLoaded')){
   loadBeatAMLData()
@@ -188,4 +188,7 @@ fullyTrainedModel<-function(drugFamily=FALSE){
     saveRDS(res,fname)
     synapseStore(fname,'syn26529370')
 }
-
+fullyTrainedModel(TRUE)
+fullyTrainedModel(FALSE)
+kFoldCrossValModels(TRUE)
+kFoldCrossValModels(FALSE)
