@@ -33,7 +33,7 @@ Now let's load the full models to assess signatures
 ##get file from synapse
 syn<-amlresistancenetworks::synapseLogin()
 eval.preds<-readRDS(syn$get('syn26529375')$path)
-all.preds<-readRDS(syn$get('syn26529376')$path)
+all.preds<-readRDS(syn$get('syn26529376')$path)all.preds<-readRDS(syn$get('syn26529376')$path)
 
 tr.dat<- pat.data%>%
     left_join(rename(pat.phos,`AML sample`='Sample',Phosphosite='LogFoldChange'))

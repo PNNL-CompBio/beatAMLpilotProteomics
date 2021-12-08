@@ -189,6 +189,7 @@ print(fname)
 tr<-tram.preds%>%
   subset(method=='LASSO')%>%
   select(genes,Molecular)
+
 ph.genelist<-getFeaturesFromString(subset(tr,Molecular=='Phosphosite')$genes,'Phosphosite')
 pr.genelist<-getFeaturesFromString(subset(tr,Molecular=='proteinLevels')$genes,'proteinLevels')
   
