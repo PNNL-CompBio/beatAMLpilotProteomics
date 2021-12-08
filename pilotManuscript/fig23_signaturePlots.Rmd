@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(amlresistancenetworks)
 library(wesanderson)
+library(DT)
+
 source("../beatAMLdata.R")
 
 pal<-wes_palette("Darjeeling1")
@@ -58,7 +60,6 @@ Given the diversity of signatures obtained from the predictive models, we use th
 #'@param data
 #'@return output of prediction
 selectDataMatAndPlot<-function(drugName,method,data,genes,doEnrich=FALSE,doGraph=FALSE){
- 
   #get dimensionality-reduced samples
   if(data%in%c('proteinLevels','mRNALevels','geneMutations','binaryMutations') &&!is.null(tr.dat)){
     data.mat<-tr.dat%>%

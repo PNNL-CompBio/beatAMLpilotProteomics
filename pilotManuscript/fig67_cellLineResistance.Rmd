@@ -13,7 +13,7 @@ library(amlresistancenetworks)
 library(wesanderson)
 library(dplyr)
 library(tidyr)
-
+library(DT)
 ##assumes figure 2 was already generated!!!!
 syn<-synapseLogin()
 full.preds<-readRDS(syn$get('syn26529376')$path)%>%#readRDS('combinedKfoldRes.rds')%>%

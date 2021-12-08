@@ -185,10 +185,10 @@ fullyTrainedModel<-function(drugFamily=FALSE){
     fname='combinedPreds.rds'
     if(drugFamily)
       fname='combinedPredsFamily.rds'
-    saveRDS(res,fname)
+    saveRDS(all.preds,fname)
     synapseStore(fname,'syn26529370')
 }
-fullyTrainedModel(TRUE)
 fullyTrainedModel(FALSE)
+fullyTrainedModel(TRUE)
 kFoldCrossValModels(TRUE)
 kFoldCrossValModels(FALSE)
