@@ -1,7 +1,7 @@
 on:
   push:
     paths:
-      - pilotManuscript/s*Rmd
+      - pilotManuscript/*Rmd
       - .github/workfows/*
 
 name: render-RMDs
