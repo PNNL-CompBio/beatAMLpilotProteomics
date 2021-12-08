@@ -10,7 +10,7 @@ install.packages("pheatmap")
 install.packages("caret")
 install.packages("tidyr")
 install.packages("dplyr")
-install.package("DT")
+install.packages("DT")
 
 #library(BiocManager)
 #BiocManager::install("EnsDb.Hsapiens.v86")
