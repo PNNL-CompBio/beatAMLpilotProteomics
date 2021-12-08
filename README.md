@@ -1,4 +1,5 @@
 # beatAMLproteomics
+
 Analysis of BEAT AML patient Pilot proteomics data.
  <!-- badges: start -->
   [![Render-RMDs](https://github.com/PNNL-CompBio/beatAMLpilotProteomics/workflows/render-RMDs/badge.svg)](https://github.com/PNNL-CompBio/beatAMLpilotProteomics/actions)
@@ -45,3 +46,18 @@ The data was pushed from raw files to long-form tables for facile querying and v
 
 ## Data Analysis
 This data analysis is mostly done, but can be described below.
+
+### Data summary
+
+We first summarize the data we have collected in Figure 1. These panels are produced in [the Figure 1 markdown](./pilotManuscript/fig1_dataSummary.Rmd). 
+
+### Model building
+
+The model building takes place outside of an R markdowns, in the [buildAndStoreModels.R](./buildAndStoreModels.R). This builds the models and stores them in a [synapse folder](https://www.synapse.org/#!Synapse:syn26529370) for later use. 
+
+### Model assessment
+Using the k-fold cross validation we re-assess the error rate in the models. 
+
+### Model selection
+
+### Model validation
