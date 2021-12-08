@@ -1,0 +1,212 @@
+---
+title: "Figure 4-5 Candidates signatures from LOO cross validation"
+author: "Sara Gosline"
+date: "02/08/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+library(amlresistancenetworks)
+library(wesanderson)
+source("../beatAMLdata.R")
+
+pal<-wes_palette("Darjeeling1")
+if(!exists('dataLoaded')){
+  loadBeatAMLData()
+  #loadUnNormPhosData()
+  dataLoaded=TRUE
+}
+
+
+```
+
+Now let's load the full models to assess signatures
+
+```{r build sigs,warning=F,message=F}
+
+ ##lets load up original preds too
+  #eval.preds<-readRDS('combinedKfoldRes.rds')
+  
+##get file from synapse
+syn<-amlresistancenetworks::synapseLogin()
+eval.preds<-readRDS(syn$get('syn26529375')$path)
+all.preds<-readRDS(syn$get('syn26529376')$path)
+
+tr.dat<- pat.data%>%
+    left_join(rename(pat.phos,`AML sample`='Sample',Phosphosite='LogFoldChange'))
+  
+  
+```
+
+## Evaluate Functional role of the signatures
+
+
+Given the diversity of signatures obtained from the predictive models, we use the signatures from the complete models and the performance from K-means validation to identify specific gene signatures. 
+
+```{r lasso preds,warning=FALSE,echo=FALSE}
+
+
+#'
+#'selectDataMatAndPlot matches the output of a predictor (new.results) to the AUC data
+#'and original molecular data to create heatmap
+#'and combines ith with the specified data type and passes along a method to be used
+#'@param drugName
+#'@param meth
+#'@param data
+#'@return output of prediction
+selectDataMatAndPlot<-function(drugName,method,data,genes,doEnrich=FALSE,doGraph=FALSE){
+ 
+  #get dimensionality-reduced samples
+  if(data%in%c('proteinLevels','mRNALevels','geneMutations','binaryMutations') &&!is.null(tr.dat)){
+    data.mat<-tr.dat%>%
+      dplyr::rename(value=data,Sample='AML sample')
+  # }else if(data=='Phosphosite'&&!is.null(pat.phos)){
+  #  data.mat<-pat.phos%>%
+  #    dplyr::select(Gene='site',Sample,value='LogFoldChange')
+  }else if(data=='Phosphosite'){
+    ##build combined matrix...
+      data.mat<-tr.dat%>%
+        dplyr::select(-Gene)%>%
+      dplyr::rename(value=data,Gene='site',Sample='AML sample')
+
+    }else{
+    print(paste("Do not have data for",data))
+    return(NULL)
+  }
+  
+  auc.d<-auc.dat%>%
+    dplyr::select(-c(medAUC,percAUC,overallSurvival,ageAtDiagnosis,family))%>%
+    dplyr::rename(Sample='AML sample')
+
+  #genes=getFeaturesFromString(genelist,data)
+  clusterSingleDrugEfficacy(drugName,method,data,doEnrich=doEnrich,
+                              this.auc.dat=auc.d,auc.thresh=100,
+                            genes,data.mat)%>%
+    subset(p.adjust<0.05)  
+
+  
+  
+  }
+
+  eval.sum<-eval.preds%>%dplyr::select(compound,Molecular,method,corVal)%>%
+    group_by(compound,Molecular,method)%>%
+    summarize(meanCor=mean(corVal,na.rm=T))
+
+  pred.lists<-do.call(rbind,apply(all.preds,1,function(x){
+    res<-getFeaturesFromStringdf(x[['genes']],x[['Molecular']])
+    print(as.data.frame(t(x)))
+    res%>%left_join(as.data.frame(t(x)),by='Molecular')
+  }))%>%
+    select(-genes)%>%
+    left_join(eval.sum)%>%
+    arrange(desc(meanCor))
+  
+  pred.lists$numFeatures<-as.character(pred.lists$numFeatures)
+    pred.lists$numSamples<-as.character(pred.lists$numSamples)
+
+  write.csv(pred.lists,file='fullDataModelFeaturesAndPerf.csv')
+  ##nanually upload for now
+ ## synTableStore(pred.lists,'Regression models from all pilot data',parentId = 'syn22128879')
+  
+  DT::datatable(pred.lists)
+  
+  new.results<-all.preds%>% left_join(eval.sum)%>%
+    arrange(desc(meanCor))%>%
+    subset(numFeatures>2)%>%#subset(MSE<1500)%>%  
+    mutate(doEnrich=TRUE)%>%
+        subset(compound%in%c('Trametinib (GSK1120212)','Quizartinib (AC220)'))%>%
+    subset(meanCor>0.1)%>%
+    dplyr::select(var='compound',method,data='Molecular',genelist='genes',doEnrich)%>%
+    rowwise()%>%
+    mutate(enrich=paste(selectDataMatAndPlot(var,method,data,genelist,doEnrich)$Description,collapse=','))
+  
+  write.csv(new.results,'selectDRugsGOenrichment.csv')
+  
+```
+
+### Network analysis
+
+Next we take the top-performing signatures for the two drugs of interest (trametinib and quizartinib) and plot them using the PCSF. For now let's focus on the multi-omic predictors.
+
+```{r plot graphs}
+plotGraphOnData<-function(df,fname){
+  print(fname)
+  dtypes<-df$DataType
+  
+  genelist<-lapply(dtypes,function(x)
+    unlist(strsplit(subset(df,DataType==x)$genelists,';')))
+  
+  allgenes<-unlist(genelist)
+  
+  names(genelist)<-dtypes
+
+  ##remove phosphosties from original analysis  
+  phospho=c()
+  if('Phosphosite'%in%dtypes){
+    phospho<-genelist$Phosphosite
+  
+        ##now we need to fix the gene list, since it's not going to match    
+    phgenes<-data.frame(genes=phospho)%>%
+      separate(genes, into=c('gene','mod'),sep='-')%>%
+      mutate(modlist=strsplit(mod,split='s|t|y'))%>%
+      apply(1,function(x) paste(x$gene,x$modlist,sep='-'))%>%
+      unlist()%>%unique()
+  
+    phospho<-phgenes
+  }
+  prots=c()
+  if('proteinLevels'%in%dtypes)
+    prots<-genelist$proteinLevels
+  
+  genes=c()
+  if("binaryMutations"%in%dtypes)
+    genes<-genelist$binaryMutations
+  
+  prot.vals<-rep(1,length(prots))
+  names(prot.vals)<-prots
+  
+  phos.vals<-rep(1,length(phospho))
+  names(phos.vals)<-phospho
+  
+  gene.vals<-rep(1,length(genes))
+  names(gene.vals)<-genes
+  
+  het=computePhosphoNetwork(phos.vals,prot.vals,gene.vals,nrand=100,beta=2,fname=fname)
+  
+  #library(PCSF)
+  #plot.PCSF(het)
+  return(het)
+}
+
+
+  plot.results<-pred.lists%>%
+    subset(compound%in%c('Trametinib (GSK1120212)','Quizartinib (AC220)'))%>%
+    subset(meanCor>0.1)%>%
+    subset(Molecular!='mRNALevels')%>%
+    #subset(Molecular=='Phosphosite')%>%
+    rowwise()%>%
+        mutate(fname=paste(c(method,compound,Molecular),collapse='_'))%>%
+  group_by(fname)%>%
+  nest(df=c(DataType,genelists))%>%
+    select(df,fname)%>%
+    purrr::pmap_dfr(.,.f=plotGraphOnData)
+
+DT::datatable(plot.results)
+
+##now get summary stats as well
+
+```
+
+
+Now we can explore specific gene signatures based on their performance and gene sets of interest.
+
+
+
+
+
+
+
+
