@@ -1,6 +1,10 @@
 # beatAMLproteomics
 Analysis of BEAT AML patient Pilot proteomics data.
+ <!-- badges: start -->
+  [![Render-RMDs](https://github.com/PNNL-CompBio/beatAMLpilotProteomics/workflows/render-RMDs/badge.svg)](https://github.com/PNNL-CompBio/beatAMLpilotProteomics/actions)
 
+  <!-- badges: end -->
+  
 
 ## Repository Overview
 
