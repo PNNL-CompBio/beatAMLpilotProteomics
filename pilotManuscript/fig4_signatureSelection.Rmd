@@ -34,8 +34,8 @@ Now let's load the full models to assess signatures
   
 ##get file from synapse
 syn<-amlresistancenetworks::synapseLogin()
-eval.preds<-readRDS(syn$get('syn26529375')$path)
-all.preds<-readRDS(syn$get('syn26529376')$path)all.preds<-readRDS(syn$get('syn26529376')$path)
+eval.preds<-readRDS(syn$get('syn26533741')$path)
+all.preds<-readRDS(syn$get('syn26530501')$path)
 
 tr.dat<- pat.data%>%
     left_join(rename(pat.phos,`AML sample`='Sample',Phosphosite='LogFoldChange'))
@@ -92,10 +92,38 @@ selectDataMatAndPlot<-function(drugName,method,data,genes,doEnrich=FALSE,doGraph
   
   }
 
+  ##what is the _Best_ predictor of each drug? 
   eval.sum<-eval.preds%>%dplyr::select(compound,Molecular,method,corVal)%>%
     group_by(compound,Molecular,method)%>%
     summarize(meanCor=mean(corVal,na.rm=T))
 
+  bestRes<-eval.sum%>%
+    group_by(compound)%>%
+    mutate(maxCor=max(meanCor,na.rm=T))%>%subset(meanCor==maxCor)%>%
+    arrange(descMeanCor)
+  
+  DT::datatable(bestRes)
+```
+
+Combining multiple data types doesn't always mean better performance. However, this approach enables us to select the _best_ model for each drug, so we can then move forward with that. 
+
+
+## Plot best models on data
+
+Each single type of data can produce good clusters. Here we take a fully trained model exemplifying this across all drugs.
+
+```{r best compare predictors}
+
+bestRes <- eval.sum%>%
+  group_by(Molecular,method)%>%
+  mutate(maxCor=max(meanCor,na.rm=T))%>%
+  subset(meanCor==maxCor)%>%
+      arrange(desc(meanCor))
+
+```
+
+
+```{r evaluate functional enrichment}   
   pred.lists<-do.call(rbind,apply(all.preds,1,function(x){
     res<-getFeaturesFromStringdf(x[['genes']],x[['Molecular']])
     print(as.data.frame(t(x)))
@@ -124,7 +152,7 @@ selectDataMatAndPlot<-function(drugName,method,data,genes,doEnrich=FALSE,doGraph
     rowwise()%>%
     mutate(enrich=paste(selectDataMatAndPlot(var,method,data,genelist,doEnrich)$Description,collapse=','))
   
-  write.csv(new.results,'selectDRugsGOenrichment.csv')
+  write.csv(new.results,'selectDrugsGOenrichment.csv')
   
 ```
 

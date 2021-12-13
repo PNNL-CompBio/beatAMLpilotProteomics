@@ -14,7 +14,7 @@ library(wesanderson)
 library(dplyr)
 library(tidyr)
 library(DT)
-##assumes figure 2 was already generated!!!!
+##pull data and models from synapse
 syn<-synapseLogin()
 full.preds<-readRDS(syn$get('syn26529376')$path)%>%#readRDS('combinedKfoldRes.rds')%>%
   subset(compound%in%c("Quizartinib (AC220)","Trametinib (GSK1120212)"))%>%
