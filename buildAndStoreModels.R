@@ -17,6 +17,11 @@ if(!exists('dataLoaded')){
 
 
 kFoldCrossValModels<-function(drugFamily=FALSE){
+  
+  ###next build full model
+  pat.data<- pat.data%>%
+    left_join(rename(pat.phos,`AML sample`='Sample',Phosphosite='LogFoldChange'))
+  
   all.pats <- intersect(pat.data$`AML sample`,auc.dat$`AML sample`)
   library(caret)
   folds<-createFolds(all.pats,k=5)
@@ -173,13 +178,7 @@ fullyTrainedModel<-function(drugFamily=FALSE){
     lr.results<-log.reg.preds%>%
       mutate(method='LogisticReg')%>%
       mutate(MSE=MSE*10000)
-    
-    #full.results<-rbind(full.results,lr.results)
-    #saveRDS(full.results,'fulllassoRegPreds.rds')
-    #saveRDS(lr.results,'fulllogRegPreds.rds')
-    #saveRDS(e.results,'fullenetRegPreds.rds')
-    #  saveRDS(full.results,'mostlyCompletePredictions.rds')
-    
+ 
     all.preds<-rbind(full.results,lr.results,e.results)
     #all.preds<-rbind(enet.preds,log.preds,reg.preds)
     fname='combinedPreds.rds'
@@ -188,7 +187,7 @@ fullyTrainedModel<-function(drugFamily=FALSE){
     saveRDS(all.preds,fname)
     synapseStore(fname,'syn26529370')
 }
-fullyTrainedModel(FALSE)
-fullyTrainedModel(TRUE)
-kFoldCrossValModels(TRUE)
+#fullyTrainedModel(FALSE)
+#fullyTrainedModel(TRUE)
 kFoldCrossValModels(FALSE)
+kFoldCrossValModels(TRUE)
