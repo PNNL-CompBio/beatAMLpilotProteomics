@@ -23,14 +23,46 @@ if(!exists('dataLoaded')){
   loadBeatAMLData()
     dataLoaded=TRUE
     
+  ##we're only working with 38 patients with drug data, so subset those
+  pat.phos <- subset(pat.phos,Sample%in%auc.dat$`AML sample`)
+  pat.data <- subset(pat.data,`AML sample`%in%auc.dat$`AML sample`)
     
   combined<-pat.phos%>%
     dplyr::rename(Phosphosite='LogFoldChange',`AML sample`='Sample')%>%
     right_join(pat.data)
 
+  ##update phosphoSite categories
+  pat.phos<-pat.phos%>%
+    mutate(phTyr=stringr::str_detect(pat.phos$site,"Y[0-9]*y|y[0-9]*Y"),
+           phSer=stringr::str_detect(pat.phos$site,"S[0-9]*s|s[0-9]*S"),
+           phThr=stringr::str_detect(pat.phos$site,"T[0-9]*t|t[0-9]*T"))%>%
+      pivot_longer(cols=c(phTyr,phSer,phThr),names_to='siteType',
+                    values_to = 'bool')%>%
+    subset(bool)%>%
+    dplyr::select(-bool)
+  
+  
+  KSDB <- read.csv(system.file('PSP&NetworKIN_Kinase_Substrate_Dataset_July2016.csv',
+                               package='amlresistancenetworks'),
+                    stringsAsFactors = FALSE)
+  
+  
+  kdat<-KSDB%>%group_by(GENE)%>%select(SUB_GENE,SUB_MOD_RSD)%>%
+    rowwise()%>%
+    mutate(subval=paste(SUB_GENE,SUB_MOD_RSD,sep='-'))%>%
+    mutate(phTyr=stringr::str_detect(SUB_MOD_RSD,'^Y'),
+           phSer=stringr::str_detect(SUB_MOD_RSD,'^S'),
+           phThr=stringr::str_detect(SUB_MOD_RSD,'^T'))%>%
+    pivot_longer(cols=c(phTyr,phSer,phThr),
+                  names_to='siteType',values_to = 'bool')%>%
+    subset(bool)%>%
+    dplyr::select(-bool)
+  
 }
 
 ```
+We have loaded all the data and can begin to visualize
+
 
 ## Data Summary
 
@@ -54,7 +86,69 @@ The goal fo this markdown is to summarize the BeatAML data that we have so far. 
   
 ```
 
-Since many of the patients are incomplete, we save a second version of the data that has only those 'complete' datasets.
+Many patients do not have complete data. What is the coverage of each data modality for each patient? How many genes are we getting?
+
+```{r data coverage}
+
+#For each patient, plot number of transcripts, WES mutations, phosphosites, proteins. 
+###get total counts
+protTotals <- pat.data%>%
+  subset(proteinLevels!=0)%>%
+  select(Gene)%>%unique()%>%nrow()
+
+transTotals<-pat.data%>%
+  subset(mRNALevels!=0.0)%>%
+  select(Gene)%>%unique()%>%nrow()
+
+mutTotals<-pat.data%>%
+  subset(binaryMutations!=0.0)%>%
+  select(Gene)%>%unique()%>%nrow()
+
+phosTotals<-pat.phos%>%
+  subset(LogFoldChange!=0)%>%
+  select(site)%>%
+  distinct()%>%nrow()
+##get per-patient counts
+
+np <- pat.data%>%
+    group_by(`AML sample`)%>%
+    subset(proteinLevels!=0)%>%
+    summarize(Proteins=n())
+
+nt <- pat.data%>%
+      group_by(`AML sample`)%>%subset(mRNALevels!=0)%>%
+      summarize(Transcripts=n())
+
+ng <- pat.data%>%
+      group_by(`AML sample`)%>%
+      subset(binaryMutations!=0)%>%
+      summarize(Mutations=n())
+
+nph <- pat.phos%>%
+      group_by(`Sample`)%>%
+      subset(LogFoldChange!=0)%>%
+      summarize(Phosphosites=n())%>%
+      dplyr::rename(`AML sample`='Sample')
+
+coverage <- np%>%full_join(nt)%>%
+  full_join(ng)%>%
+  full_join(nph)%>%
+  tidyr::pivot_longer(cols=c(2:5),names_to='data type',values_to='number of features')
+
+library(ggplot2)
+ggplot(coverage,aes(x=`data type`,col=`data type`,y=`number of features`))+
+  geom_jitter()+
+  scale_y_log10()+
+  ggtitle("Number of features across data types")
+
+ggsave('featureSpaceSummary.pdf')
+
+DT::datatable(data.frame(DataType=c('Transcripts','Mutations','Proteins','Phosphosites'),
+           numFeatures=c(transTotals,mutTotals,protTotals,phosTotals)))
+
+```
+
+The datasets are indeed of varying size, and also have varying number of patients. Since many of the patients are incomplete, we save a second version of the data that has only those 'complete' datasets.
 
 ```{r full patients}
 
@@ -66,12 +160,15 @@ red.phos<-pat.phos%>%subset(Sample%in%full.pats$`AML sample`)
 knitr::kable(res[full.pats$`AML sample`,])
 ```
 
+
+
 ## Drug Family summary
 
 We can also collate information by drug family to increase power. 
 
 
 ```{r drug family, message=FALSE, warning=FALSE}
+
   res<-auc.dat.fam%>%select(-c('FLT3-ITD','FLT3-MUT','NPM1'))%>%
     plotAllAUCs(.,pat.data,drug.metric='AUC',drug.column='family')
 
@@ -104,9 +201,10 @@ library(ggplot2)
 mp<-combined%>%
   dplyr::select('AML sample','proteinLevels','mRNALevels','Gene')%>%
   distinct()%>%
-  subset(mRNALevels>1)%>%
-  group_by(`AML sample`)%>%
-  summarize(corval=cor(proteinLevels,mRNALevels,method='spearman',use='pairwise.complete.obs'))
+  subset(mRNALevels!=0.0)%>%
+  group_by(Gene)%>%
+  summarize(corval=cor(proteinLevels,mRNALevels,method='spearman',use='pairwise.complete.obs'))%>%
+  subset(!is.na(corval))
 
 DT::datatable(mp)
 
@@ -115,10 +213,10 @@ meancor=mean(mp$corval)
 mpp<-combined%>%
   dplyr::select('AML sample','proteinLevels','mRNALevels','Gene','binaryMutations')%>%
   distinct()%>%
-  subset(mRNALevels>1)%>%
+  subset(mRNALevels!=0)%>%
   subset(proteinLevels!=0)%>%
   mutate(mRNALevels=log10(0.01+mRNALevels))%>%
-  ggplot(aes(x=mRNALevels,y=proteinLevels,col=`AML sample`,shape=as.factor(binaryMutations)))+geom_point()+scale_color_viridis_d()+ggtitle(paste0('mRNA/Protein correlation: ',meancor))
+  ggplot(aes(x=mRNALevels,y=proteinLevels))+geom_hex(bins=100)+scale_fill_viridis_c()+ggtitle(paste0('mRNA/Protein correlation: ',meancor))
 
 ggsave('protMrnaCor.pdf',mpp)
 
@@ -133,10 +231,11 @@ No real correlation here
 ```{r prot phospho cor, warning=FALSE}
 library(dplyr)
 mp<-combined%>%
-  dplyr::select('AML sample','proteinLevels','Phosphosite','Gene')%>%
+  dplyr::select('AML sample','proteinLevels','Phosphosite','Gene','site')%>%
   distinct()%>%
-  group_by(`AML sample`)%>%
-  summarize(corval=cor(proteinLevels,Phosphosite,method='spearman',use='pairwise.complete.obs'))
+  group_by(site)%>%
+  summarize(corval=cor(proteinLevels,Phosphosite,method='spearman',use='pairwise.complete.obs'))%>%
+  subset(!is.na(corval))
 
 DT::datatable(mp)
 meancor=mean(mp$corval)
@@ -147,15 +246,14 @@ mpp<-combined%>%
  # subset(mRNALevels>1)%>%
   subset(proteinLevels!=0)%>%
 #  mutate(mRNALevels=log10(0.01+mRNALevels))%>%
-  ggplot(aes(x=Phosphosite,y=proteinLevels,col=`AML sample`,shape=as.factor(binaryMutations)))+geom_point()+scale_color_viridis_d()+ggtitle(paste0('Protein/phosphosite correlation: ',meancor))
+  ggplot(aes(x=Phosphosite,y=proteinLevels))+geom_hex(bins=100)+scale_fill_viridis_c()+ggtitle(paste0('Protein/phosphosite correlation: ',meancor))
 
 ggsave('protPhosho.pdf',mpp)
 
 
 ```
-### gene/mRNA
 
-### gene/protein
+Now we can evaluate specific pathways.
 
 ## FLT3 pathway visualization
 
@@ -285,7 +383,7 @@ dotplots<-lapply(subset(genecors,!is.na(pcor))$Gene,function(x)
   subset(flt3.pats,Gene==x)%>%
  #   mutate(mRNALevels=log10(0.01+mRNALevels))%>%
     mutate(mutated=as.factor(binaryMutations))%>%
-    ggplot(aes(x=proteinLevels,y=Phosphosite,color=AUC,shape=site))+geom_point()+ggtitle(x)
+    ggplot(aes(x=proteinLevels,y=Phosphosite,size=AUC,color=site))+geom_point()+ggtitle(x)
 )
 
 p<-cowplot::plot_grid(plotlist=dotplots, ncol=2)
@@ -427,7 +525,7 @@ dotplots<-lapply(subset(genecors,!is.na(pcor))$Gene,function(x)
   subset(erk1.pats,Gene==x)%>%
  #   mutate(mRNALevels=log10(0.01+mRNALevels))%>%
     mutate(mutated=as.factor(binaryMutations))%>%
-    ggplot(aes(x=proteinLevels,y=Phosphosite,color=AUC,shape=site))+geom_point()+ggtitle(x)
+    ggplot(aes(x=proteinLevels,y=Phosphosite,size=AUC,color=site))+geom_point()+ggtitle(x)
 )
 
 p<-cowplot::plot_grid(plotlist=dotplots, ncol=2)
@@ -439,11 +537,91 @@ ggsave('erk1_phosphoDotPlots.pdf',p,width=12,height=12)
 
 These figures suggest that mRNA and protein data are not highly correlated with drug response, as we'd expect, nor is phosphosite and protein data.
 
+
+##Phosphosite coverage
+
+We are curious to see how the various phosphosites are captured in the data
+
 ```{r phospho plots}
 
+siteMap <- pat.phos%>%
+  dplyr::select(site,siteType)%>%
+  distinct()
+
+sgenes<-tibble(site=unlist(siteMap$site))%>%
+    tidyr::separate(site,
+                    into=c('gene0','gene1','mod'),
+                    sep='-',fill='left',remove=FALSE)%>% ##allow for dashed genes
+    tidyr::unite(gene0,gene1,col='gene',sep='-')%>%
+    mutate(gene=stringr::str_replace(gene,'^NA-',''))%>%
+    tidyr::separate(mod,
+                    into=c('mod1','mod2','mod3','mod4'),
+                    extra='merge',sep='s|t|y')%>%
+    tidyr::pivot_longer(cols=c(mod1,mod2,mod3,mod4),
+                        names_to='var',values_to='mod')%>%
+    dplyr::select(-var)%>%
+    subset(mod!="")%>%
+    subset(!is.na(mod))%>%
+    tidyr::unite(gene,mod,col='singlesite',sep='-',remove=FALSE)%>%
+    mutate(phTyr=stringr::str_detect(mod,'^Y'),
+             phSer=stringr::str_detect(mod,'^S'),
+             phThr=stringr::str_detect(mod,'^T'))%>%
+    pivot_longer(cols=c(phTyr,phSer,phThr),
+                  names_to='siteType',values_to = 'bool')%>%
+    subset(bool)%>%
+    dplyr::select(-bool)%>%
+    unique()
+  
+siteCount<-sgenes%>%select(singlesite,siteType)%>%distinct()
+
+print(paste(nrow(siteCount),'sites covered'))
+##what is the coverage of site across amples?
+
+sampCounts<-pat.phos%>%
+  group_by(site)%>%
+  summarize(nSamples=n_distinct(Sample))%>%
+  left_join(sgenes)
+
+library(ggplot2)
+
+ggplot(sampCounts,aes(x=nSamples,fill=siteType))+geom_histogram()+scale_fill_viridis_d()+ggtitle('Phosphosites measured across samples')
+
+ggsave('phosphositeCoverageAcrossPatients.pdf')
+
+dtab<-siteCount%>%group_by(siteType)%>%
+  summarize(totalSites=n_distinct(singlesite))
+DT::datatable(dtab)
+
+ggplot(siteCount,aes(x=siteType,fill=siteType))+
+  geom_histogram(stat='count')+
+  scale_fill_viridis_d()+
+  ggtitle("Phosphosites measured by global phosphproteomics")
+
+ggplot(kdat,aes(x=siteType,fill=siteType))+
+  geom_histogram(stat='count')+
+  scale_fill_viridis_d()+
+  ggtitle('Phosphosites measured in PhophositeDB+NetworKIN')
+```
 
 
+Now that we have these stats we can compare how the different datasets compare.
+
+```{r overlap}
+
+combined <- sgenes%>%
+  rename(subval='singlesite')%>%
+  full_join(kdat)%>%
+  dplyr::select(-GENE)%>%
+  distinct()%>%
+  rowwise()%>%
+  mutate(annotation=ifelse(is.na(SUB_GENE),'NotInDB',ifelse(is.na(gene),'NotMeasured',"MeasuredAndannotated")))
 
 
+ggplot(combined,aes(x=siteType,fill=annotation))+
+  geom_histogram(stat='count',position='dodge')+
+  scale_fill_viridis_d()+
+  ggtitle('Phosphosites measured in data and PhophositeDB+NetworKIN')
+
+ggsave("phosphositeCoverageInDBs.pdf")
 
 ```

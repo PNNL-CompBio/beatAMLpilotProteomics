@@ -80,9 +80,19 @@ full.quiz.prot<-quizPhosData%>%
 spreadAndSelect<-function(df,genes,mol, method,var){
   library(pheatmap)
   fname=paste0(method,'_preds_of_',var,'_with_',mol,'.pdf')
+<<<<<<< Updated upstream:pilotManuscript/fig67_cellLineResistance.Rmd
   print(fname)
   genelist<-getFeaturesFromString(genes,mol)
   #print(genelist)
+=======
+ # print(fname)
+  
+  ##update this
+  genelist<-getFeaturesFromString(genes,mol)%>%unlist()
+  if(length(genelist)<3)
+    return(fname)
+#print(genelist)
+>>>>>>> Stashed changes:pilotManuscript/fig56_cellLineResistance.Rmd
   sdf<-subset(df,Molecular==mol)
   #print(sdf)
   mat<-sdf%>%
@@ -96,12 +106,12 @@ spreadAndSelect<-function(df,genes,mol, method,var){
   annotes<-sdf%>%
     select(CellType,sample)%>%distinct()%>%
     tibble::column_to_rownames('sample')
-  annote.colors<-list(CellType=wes_palette('Darjeeling2',length(unique(sdf$CellType))))
+  annote.colors<-list(CellType=wes_palette('Royal1',length(unique(sdf$CellType))))
   names(annote.colors$CellType)<-unique(sdf$CellType)
   #print(annotes)
   pheatmap(mat,annotation_col=annotes, cellheight=10,cellwidth=10,
            filename=fname,clustering_method='ward.D2',annotation_colors = annote.colors, 
-           clustering_distance_cols = 'euclidean', clustering_distance_rows='euclidean',color=pal)
+           clustering_distance_cols = 'euclidean', clustering_distance_rows='euclidean')#,color=pal)
   return(fname)
 }
 
@@ -184,14 +194,21 @@ print(fname)
 
 tr<-tram.preds%>%
   subset(method=='LASSO')%>%
+<<<<<<< Updated upstream:pilotManuscript/fig67_cellLineResistance.Rmd
   select(genes,Molecular)
 ph.genelist<-getFeaturesFromString(subset(tr,Molecular=='Phosphosite')$genes,'Phosphosite')
 pr.genelist<-getFeaturesFromString(subset(tr,Molecular=='proteinLevels')$genes,'proteinLevels')
+=======
+  dplyr::select(genes,Molecular)
+
+ph.genelist<-getFeaturesFromString(subset(tr,Molecular=='Phosphosite')$genes,'Phosphosite')%>%unlist()
+pr.genelist<-getFeaturesFromString(subset(tr,Molecular=='proteinLevels')$genes,'proteinLevels')%>%unlist()
+>>>>>>> Stashed changes:pilotManuscript/fig56_cellLineResistance.Rmd
   
 
     ##now we need to fix the gene list, since it's not going to match    
 phgenes<-data.frame(genes=ph.genelist)%>%
-  separate(genes, into=c('gene','mod'),sep='-')%>%
+  tidyr::separate(genes, into=c('gene','mod'),sep='-')%>%
   mutate(modlist=strsplit(mod,split='s|t|y'))%>%
   apply(1,function(x) paste(x$gene,x$modlist,sep='-'))%>%
   unlist()%>%unique()
@@ -210,11 +227,11 @@ fname=paste0('Logistic-trametinib-preds')
 print(fname)    
 
 tr.preds<-tram.preds%>%
-  subset(method=='Logistic')%>%
+  subset(method=='LogisticReg')%>%
   select(genes,Molecular)
 
-ph.genelist<-getFeaturesFromString(subset(tr.preds,Molecular=='Phosphosite')$genes,'Phosphosite')
-pr.genelist<-getFeaturesFromString(subset(tr.preds,Molecular=='proteinLevels')$genes,'proteinLevels')
+ph.genelist<-getFeaturesFromString(subset(tr.preds,Molecular=='Phosphosite')$genes,'Phosphosite')%>%unlist()
+pr.genelist<-getFeaturesFromString(subset(tr.preds,Molecular=='proteinLevels')$genes,'proteinLevels')%>%unlist()
   
 
     ##now we need to fix the gene list, since it's not going to match    
@@ -244,9 +261,9 @@ print(fname)
 qu.preds<-quiz.preds%>%
   subset(method=='LASSO')%>%
   select(genes,Molecular)
-ph.genelist<-getFeaturesFromString(subset(qu.preds,Molecular=='Phosphosite')$genes,'Phosphosite')
-pr.genelist<-getFeaturesFromString(subset(qu.preds,Molecular=='proteinLevels')$genes,'proteinLevels')
-  
+
+ph.genelist<-getFeaturesFromString(subset(qu.preds,Molecular=='Phosphosite')$genes,'Phosphosite')%>%unlist()
+pr.genelist<-getFeaturesFromString(subset(qu.preds,Molecular=='proteinLevels')$genes,'proteinLevels')%>%unlist()
 
     ##now we need to fix the gene list, since it's not going to match    
 phgenes<-data.frame(genes=ph.genelist)%>%
@@ -264,15 +281,16 @@ names(prot.vals)<-pr.genelist
 het=computePhosphoNetwork(phos.vals,prot.vals,nrand=100,beta=4,fname)
 #library(PCSF)
 #plot.PCSF(het)
-##logistic preds
+
+#logistic preds
 fname=paste0('Logistic-quizartinib-preds')
 print(fname)    
 
 qu.preds<-quiz.preds%>%
-  subset(method=='Logistic')%>%
+  subset(method=='LogisticReg')%>%
   select(genes,Molecular)
-ph.genelist<-getFeaturesFromString(subset(qu.preds,Molecular=='Phosphosite')$genes,'Phosphosite')
-pr.genelist<-getFeaturesFromString(subset(qu.preds,Molecular=='proteinLevels')$genes,'proteinLevels')
+ph.genelist<-getFeaturesFromString(subset(qu.preds,Molecular=='Phosphosite')$genes,'Phosphosite')%>%unlist()
+pr.genelist<-getFeaturesFromString(subset(qu.preds,Molecular=='proteinLevels')$genes,'proteinLevels')%>%unlist()
   
 
     ##now we need to fix the gene list, since it's not going to match    

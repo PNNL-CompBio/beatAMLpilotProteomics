@@ -1,0 +1,130 @@
+---
+title: "Build K-fold models for use for individual drugs and families"
+author: "Sara Gosline"
+date: "10/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("../beatAMLdata.R")
+library(amlresistancenetworks)
+library(ggplot2)
+library(dplyr)
+library(wesanderson)
+
+```
+
+## Load data and models
+We have created a standard file to load all the data needed for the analysis. We also merge the gene based data and the phosphosite data by Gene and Sample, and then load existing models that were pre-computed and stored on synapse.
+
+```{r load data, error=FALSE, message=FALSE, warning=FALSE}
+#loadBeatAMLData()
+
+#pat.data<- pat.data%>%
+#  left_join(rename(pat.phos,`AML sample`='Sample',Phosphosite='LogFoldChange'))
+
+##get files from synapse
+syn<-amlresistancenetworks::synapseLogin()
+res<-readRDS(syn$get('syn26533741')$path)
+familyRes<-readRDS(syn$get('syn26536929')$path)
+pal<-c(wes_palette('Darjeeling1'),wes_palette('Darjeeling2'))
+
+##load file
+```
+
+
+Now we have all the data files and ready to go!
+
+## Evaluate model performance for single drugs
+
+Let's plot the k-fold results by data type. 
+```{r plot results}
+
+p3<-familyRes%>%
+  subset(numFeatures>0)%>%
+    ggplot(aes(y=corVal,x=Molecular,fill=Molecular))+
+          geom_boxplot(aes(alpha=0.5))+
+          geom_jitter(aes(color=Molecular))+
+  scale_color_manual(values=pal)+
+scale_fill_manual(values=pal)+facet_grid(~method)
+
+p3
+write.csv(res%>%group_by(Molecular,method)%>%summarize(meanCor=mean(corVal,na.rm=T))%>%
+            arrange(desc(meanCor)),file='table1_overallPerf.csv')
+ggsave('5foldCVperformance.pdf',p3,width=12)
+
+```
+
+It seems that the protein data performs well. We can break down by drug as well to see how individual drugs perform.
+
+```{r plot drugs, message=F}
+
+  p4<-res%>%subset(numFeatures>0)%>%
+    ggplot(aes(y=corVal,x=compound,fill=Molecular))+
+          geom_boxplot(aes(alpha=0.5))+
+       #   geom_jitter(aes(color=Molecular))+
+  scale_color_manual(values=pal)+
+scale_fill_manual(values=pal)+coord_flip()+facet_grid(~method)
+
+p4
+
+write.csv(res%>%group_by(Molecular,method,compound)%>%summarize(meanCor=mean(corVal,na.rm=T),samples=mean(numSamples,na.rm=T))%>%arrange(desc(meanCor)),'table2.csv')
+ggsave('5foldCVperformanceByDrug.pdf',p4,height=12,width=10)
+
+```
+
+Now we can  save the gene lists to synapse
+```{r warning=FALSE, message=FALSE}
+
+  pred.lists<-do.call(rbind,apply(res,1,function(x){
+    res2<-getFeaturesFromStringdf(x[['genes']],x[['Molecular']])
+   # print(as.data.frame(t(x)))
+    res2%>%left_join(as.data.frame(t(x)),by='Molecular')
+  }))%>%
+     select(-genes)%>%
+  #  left_join(eval.sum)%>%
+    arrange(desc(corVal))
+
+  write.csv(pred.lists,file='fiveFoldModelFeaturesAndPerf.csv')
+# synTableStore(pred.lists,'Regression crossvalidation from all pilot data',parentId = 'syn22128879')
+
+```
+
+## Drug family model performance
+
+here we wanted to ask if the regression models performed better if we increase the power and group by drug family. 
+
+Let's plot the k-fold results by data type. 
+```{r plot family results}
+
+
+p3<-familyRes%>%
+  subset(numFeatures>0)%>%
+    ggplot(aes(y=corVal,x=Molecular,fill=Molecular))+
+          geom_boxplot(aes(alpha=0.5))+
+          geom_jitter(aes(color=Molecular))+
+  scale_color_manual(values=pal)+
+scale_fill_manual(values=pal)+facet_grid(~method)
+
+p3
+
+ggsave('5foldCVFamilyperformance.pdf',p3,width=12)
+
+```
+
+It seems that the protein data performs well. We can break down by drug as well to see how individual drug families perform.
+
+```{r plot families, message=F}
+
+  p4<-familyRes%>%subset(numFeatures>0)%>%
+    ggplot(aes(y=corVal,x=compound,fill=Molecular))+
+          geom_boxplot(aes(alpha=0.5))+
+          geom_jitter(aes(color=Molecular))+
+  scale_color_manual(values=pal)+
+scale_fill_manual(values=pal)+coord_flip()+facet_grid(~method)
+
+p4
+
+ggsave('5foldCVperformanceByDrugFamily.pdf',p4,height=12,width=12)
+```
