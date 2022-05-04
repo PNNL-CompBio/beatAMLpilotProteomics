@@ -80,19 +80,12 @@ full.quiz.prot<-quizPhosData%>%
 spreadAndSelect<-function(df,genes,mol, method,var){
   library(pheatmap)
   fname=paste0(method,'_preds_of_',var,'_with_',mol,'.pdf')
-<<<<<<< Updated upstream:pilotManuscript/fig67_cellLineResistance.Rmd
-  print(fname)
-  genelist<-getFeaturesFromString(genes,mol)
-  #print(genelist)
-=======
- # print(fname)
-  
+
   ##update this
   genelist<-getFeaturesFromString(genes,mol)%>%unlist()
   if(length(genelist)<3)
     return(fname)
 #print(genelist)
->>>>>>> Stashed changes:pilotManuscript/fig56_cellLineResistance.Rmd
   sdf<-subset(df,Molecular==mol)
   #print(sdf)
   mat<-sdf%>%
@@ -194,17 +187,11 @@ print(fname)
 
 tr<-tram.preds%>%
   subset(method=='LASSO')%>%
-<<<<<<< Updated upstream:pilotManuscript/fig67_cellLineResistance.Rmd
-  select(genes,Molecular)
-ph.genelist<-getFeaturesFromString(subset(tr,Molecular=='Phosphosite')$genes,'Phosphosite')
-pr.genelist<-getFeaturesFromString(subset(tr,Molecular=='proteinLevels')$genes,'proteinLevels')
-=======
   dplyr::select(genes,Molecular)
 
 ph.genelist<-getFeaturesFromString(subset(tr,Molecular=='Phosphosite')$genes,'Phosphosite')%>%unlist()
 pr.genelist<-getFeaturesFromString(subset(tr,Molecular=='proteinLevels')$genes,'proteinLevels')%>%unlist()
->>>>>>> Stashed changes:pilotManuscript/fig56_cellLineResistance.Rmd
-  
+
 
     ##now we need to fix the gene list, since it's not going to match    
 phgenes<-data.frame(genes=ph.genelist)%>%

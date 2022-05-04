@@ -1,5 +1,5 @@
 ---
-title: "Figure 4-5 Candidates signatures from LOO cross validation"
+title: "Figure 3 Candidates signatures from LOO cross validation"
 author: "Sara Gosline"
 date: "02/08/2021"
 output: html_document
@@ -29,78 +29,7 @@ We first collected the stores results generated in `../buildAndStoreModels.R` an
 
 ```{r build sigs,warning=F,message=F}
 
-<<<<<<< Updated upstream:pilotManuscript/fig23_signaturePlots.Rmd
-tr.dat<- pat.data%>%
-  left_join(rename(pat.phos,`AML sample`='Sample',Phosphosite='LogFoldChange'))
 
-
-##lets load up original preds too
-eval.preds<-readRDS('combinedKfoldRes.rds')
-
-if(file.exists('combinedPreds.rds')){
-  all.preds<-readRDS('combinedPreds.rds')
-}else{
-  eval.list<-list(
-    combo=list(mf=c('Gene','Gene','Gene','site'),
-               fn=c('mRNALevels','proteinLevels','binaryMutations','Phosphosite')),
-    mRNA=c('Gene','mRNALevels'),
-    prot=c("Gene","proteinLevels"),
-    mut=c('Gene','binaryMutations'),
-    phosph=c('site','Phosphosite'))
-
-  
-  message('Running lasso')
-    ##now train model on AML and eval on depmap data
-  reg.preds<-purrr::map_df(eval.list,
-                         ~ amlresistancenetworks::drugMolRegression(auc.dat,
-                            tr.dat,
-                            mol.feature=.x[1],
-                            mol.feature.name=.x[2],                                                   
-                                                 category='Condition'))
-  
-  
-    message("Comparing logistic preds")
-  
-    log.reg.preds<-purrr::map_df(eval.list,
-                             ~ drugMolLogReg(auc.dat,
-                                                tr.dat,
-                                               mol.feature=.x[1],
-                                                            mol.feature.name=.x[2],
-                                              category='Condition'))
-
-        message("Running elastic net")
-
-  
-  enet.reg.preds<-purrr::map_df(eval.list,
-                         ~ drugMolRegression(auc.dat,
-                            tr.dat,
-                             mol.feature=.x[1],
-                                mol.feature.name=.x[2],
-                                                 category='Condition',doEnet=TRUE))
-  
-  
-  
-  e.results<-enet.reg.preds%>%
-    mutate(method='ElasticNet')
- 
-  full.results<-reg.preds%>%
-    mutate(method='LASSO')
-
-  lr.results<-log.reg.preds%>%
-    mutate(method='LogisticReg')%>%
-    mutate(MSE=MSE*10000)
-  
-  #full.results<-rbind(full.results,lr.results)
-  saveRDS(full.results,'fulllassoRegPreds.rds')
-  saveRDS(lr.results,'fulllogRegPreds.rds')
-  saveRDS(e.results,'fullenetRegPreds.rds')
-#  saveRDS(full.results,'mostlyCompletePredictions.rds')
-  
-  all.preds<-rbind(full.results,lr.results,e.results)
-  #all.preds<-rbind(enet.preds,log.preds,reg.preds)
-  saveRDS(all.preds,'combinedPreds.rds')
-  }
-=======
 ##get file from synapse
 syn<-amlresistancenetworks::synapseLogin()
 eval.preds<-readRDS(syn$get('syn26533741')$path)
@@ -109,16 +38,12 @@ all.preds<-readRDS(syn$get('syn26530501')$path)
 tr.dat<- pat.data%>%
     left_join(rename(pat.phos,`AML sample`='Sample',Phosphosite='LogFoldChange'))%>%
   subset(`AML sample`%in%auc.dat$`AML sample`)
->>>>>>> Stashed changes:pilotManuscript/fig34_signatureSelection.Rmd
 
 ```
 
 ## Evaluate Functional role of the signatures
 
 
-<<<<<<< Updated upstream:pilotManuscript/fig23_signaturePlots.Rmd
-Given the diversity of signatures otbtained from the predictive models, we use the signatures from the complete models and the performance from K-means validation to identify specific gene signatures. 
-=======
 First we rank the signatures by their performance across k-fold cross validation. We can now select the combination of predictive model and data type (combo) that best predicts drug response according to correlation across all folds of cross validation.
 
 ```{r get best predictors, message=FALSE}
@@ -143,7 +68,6 @@ For trametinib and quizartinib, logistic regression works best, on mRNA and prot
 ## Plot best models on data
 
 It is important to create a generic function that will select the features from the model and plot them in heatmaps, as well as carry out functional enrichment. 
->>>>>>> Stashed changes:pilotManuscript/fig34_signatureSelection.Rmd
 
 ```{r lasso preds,warning=FALSE,echo=FALSE}
 
@@ -156,12 +80,8 @@ It is important to create a generic function that will select the features from 
 #'@param meth
 #'@param data
 #'@return output of prediction
-<<<<<<< Updated upstream:pilotManuscript/fig23_signaturePlots.Rmd
-selectDataMatAndPlot<-function(drugName,method,data,genes,doEnrich=FALSE,doGraph=FALSE){
- 
-=======
+
 selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE,doGraph=FALSE){
->>>>>>> Stashed changes:pilotManuscript/fig34_signatureSelection.Rmd
   #get dimensionality-reduced samples
   data.types <- getFeaturesFromStringdf(genelist,data)
   pal<-wes_palette("Darjeeling1")
@@ -204,12 +124,7 @@ selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE,doGr
           subset(p.adjust<0.05))
   #print(kres)
   }
-<<<<<<< Updated upstream:pilotManuscript/fig23_signaturePlots.Rmd
 
-  eval.sum<-eval.preds%>%dplyr::select(compound,Molecular,method,corVal)%>%
-    group_by(compound,Molecular,method)%>%
-    summarize(meanCor=mean(corVal,na.rm=T))
-=======
   if(doGraph){
     ##build graph
   }
@@ -252,8 +167,6 @@ We can then iterate over this function to do the plotting.
 
 ```{r evaluate functional enrichment}   
 
->>>>>>> Stashed changes:pilotManuscript/fig34_signatureSelection.Rmd
-
   pred.lists<-do.call(rbind,apply(all.preds,1,function(x){
     res<-getFeaturesFromStringdf(x[['genes']],x[['Molecular']])
    # print(as.data.frame(t(x)))
@@ -277,18 +190,14 @@ We can then iterate over this function to do the plotting.
     arrange(desc(meanCor))%>%
     subset(numFeatures>2)%>%#subset(MSE<1500)%>%  
     mutate(doEnrich=TRUE)%>%
-        subset(compound%in%c('Trametinib (GSK1120212)','Quizartinib (AC220)'))%>%
+     #   subset(compound%in%c('Trametinib (GSK1120212)','Quizartinib (AC220)'))%>%
     subset(meanCor>0.1)%>%
     dplyr::select(var='compound',method,data='Molecular',genelist='genes',doEnrich)%>%
     rowwise()%>%
     mutate(enrich=paste(selectDataMatAndPlot(var,method,data,genelist,doEnrich)$Description,collapse=','))
-  
-<<<<<<< Updated upstream:pilotManuscript/fig23_signaturePlots.Rmd
-  write.csv(new.results,'selectDRugsGOenrichment.csv')
-=======
+
   write.csv(new.results,'allDrugsGOenrichment.csv')
->>>>>>> Stashed changes:pilotManuscript/fig34_signatureSelection.Rmd
-  
+
 ```
 
 ### Network analysis
