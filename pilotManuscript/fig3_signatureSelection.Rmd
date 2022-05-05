@@ -5,7 +5,7 @@ date: "02/08/2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE,echo=FALSE,warning=FALSE,message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 
@@ -83,20 +83,23 @@ It is important to create a generic function that will select the features from 
 
 selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE,doGraph=FALSE){
   #get dimensionality-reduced samples
+  
+  ##get features from model
   data.types <- getFeaturesFromStringdf(genelist,data)
-  pal<-wes_palette("Darjeeling1")
+  
+  ##making pretty
+  pal<-wes_palette("Darjeeling2")
+  dat.colors <- pal[1:4]
+  names(dat.colors)<-c('Phosphosite','proteinLevels','mRNALevels','binaryMutations')
+  annote.colors <- list(Datatype=dat.colors,Sensitive = c(`TRUE` = "darkgrey", `FALSE` = "white"))
+    
+  #prep output
   gres<- data.frame(ID = "", Description = "", pvalue = 1, 
         p.adjust = 1)
   kres<-data.frame(ID = "", Description = "", pvalue = 1, 
         p.adjust = 1)
   
-  dat.colors <- pal[1:4]
-  names(dat.colors)<-c('Phosphosite','proteinLevels','mRNALevels','binaryMutations')
-  annote.colors <- list(Datatype=dat.colors,Sensitive = c(`TRUE` = "darkgrey", `FALSE` = "white"))
-    
- # pal <- wes_palette("Darjeeling1", 100, type = "continuous")
- 
-  
+  ##prep data
   res = apply(data.types,1,function(y) {
     gl=unlist(strsplit(y[['genelists']],split=';'))
     if(y[['DataType']]=='Phosphosite') 
@@ -116,8 +119,6 @@ selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE,doGr
     ##do enrichment of genes and sites separately
     subs<-subset(res,Datatype=='Phosphosite')
     genes<-subset(res,Datatype!='Phosphosite')
- # print(genes)
-#  print(subs)
     try(gres<-doRegularGo(genes=unique(genes$Gene)))
   #print(gres)
     try(kres<-doRegularKin(genes=unique(subs$Gene))%>%
@@ -127,12 +128,31 @@ selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE,doGr
 
   if(doGraph){
     ##build graph
+    gene.vals<-rep(1,nrow(subset(res,DataType=='binaryMutations')))
+    names(gene.vals)<-subset(res,Datatype=='binaryMutations')$Gene
+    
+    
+    prot.vals<-rep(1,nrow(subset(res,Datatype=='proteinLevels')))
+    names(prot.vals)<-subset(res,Datatype=='proteinLevels')$Gene
+    
+    rna.vals<-rep(1,nrow(subset(res,Datatype=='mRNALevels')))
+    names(rna.vals)<-subset(res,Datatype=='mRNALevels')$Gene
+    
+    phos.vals<-rep(1,nrow(subset(res,Datatype=='Phosphosite')))
+    names(phos.vals)<-subset(res,Datatype=='Phosphosite')$Gene
+    
+    fname=paste0(drugName,'_',method,'_',data,'network.gml')
+    res<-computePhosphoNetwork(phos.vals,prot.vals,gene.vals,rna.vals,fname=fname)
   }
-  #print(res)
- 
+
+  dupes <- which(duplicated(res$Gene))
+  if(length(dupes)>0)
+    res <- res%>%unite(c(Gene,Datatype),col='Gene',remove=FALSE)
+                                   
   #otherwise just plot
   mat <- res%>%dplyr::select(`AML sample`,value,Gene)%>%
-    pivot_wider(names_from=`AML sample`,values_from=value,values_fill=list(value=0.0),values_fn=mean)%>%
+    pivot_wider(names_from=`AML sample`,
+                values_from=value,values_fill=list(value=0.0),values_fn=mean)%>%
     tibble::column_to_rownames('Gene')
   
  # print(mat)
@@ -150,13 +170,14 @@ selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE,doGr
     
     library(pheatmap)
     fname=paste0(drugName,'_',method,'_',data,'expression.pdf')
-    pheatmap(mat,annotation_row = gene.d,annotation_col=auc.d,
-             annotation_colors=annote.colors, clustering_method='ward.D2',scale='row',
+    pheatmap(mat,annotation_row = gene.d,
+             annotation_col=auc.d,
+             annotation_colors=annote.colors,
+             clustering_method='ward.D2',scale='row',
              cellwidth = 10,cellheight = 10,filename = fname)
 
     fres<-rbind(gres,kres)
-    #print(fres)
-  return(fres)
+   return(fres)
   
   }
 ```
@@ -191,7 +212,7 @@ We can then iterate over this function to do the plotting.
     subset(numFeatures>2)%>%#subset(MSE<1500)%>%  
     mutate(doEnrich=TRUE)%>%
      #   subset(compound%in%c('Trametinib (GSK1120212)','Quizartinib (AC220)'))%>%
-    subset(meanCor>0.1)%>%
+    subset(meanCor>0.5)%>%
     dplyr::select(var='compound',method,data='Molecular',genelist='genes',doEnrich)%>%
     rowwise()%>%
     mutate(enrich=paste(selectDataMatAndPlot(var,method,data,genelist,doEnrich)$Description,collapse=','))
@@ -205,73 +226,21 @@ We can then iterate over this function to do the plotting.
 Next we take the top-performing signatures for the two drugs of interest (trametinib and quizartinib) and plot them using the PCSF. For now let's focus on the multi-omic predictors.
 
 ```{r plot graphs}
-plotGraphOnData<-function(df,fname){
-  print(fname)
-  dtypes<-df$Datatype
-  
-  genelist<-lapply(dtypes,function(x)
-    unlist(strsplit(subset(df,DataType==x)$genelists,';')))
-  
-  allgenes<-unlist(genelist)
-  
-  names(genelist)<-dtypes
-
-  ##remove phosphosties from original analysis  
-  phospho=c()
-  if('Phosphosite'%in%dtypes){
-    phospho<-genelist$Phosphosite
-  
-        ##now we need to fix the gene list, since it's not going to match    
-    phgenes<-data.frame(genes=phospho)%>%
-      separate(genes, into=c('gene','mod'),sep='-')%>%
-      mutate(modlist=strsplit(mod,split='s|t|y'))%>%
-      apply(1,function(x) paste(x$gene,x$modlist,sep='-'))%>%
-      unlist()%>%unique()
-  
-    phospho<-phgenes
-  }
-  prots=c()
-  if('proteinLevels'%in%dtypes)
-    prots<-genelist$proteinLevels
-  
-  genes=c()
-  if("binaryMutations"%in%dtypes)
-    genes<-genelist$binaryMutations
-  
-  prot.vals<-rep(1,length(prots))
-  names(prot.vals)<-prots
-  
-  phos.vals<-rep(1,length(phospho))
-  names(phos.vals)<-phospho
-  
-  gene.vals<-rep(1,length(genes))
-  names(gene.vals)<-genes
-  
-  het=computePhosphoNetwork(phos.vals,prot.vals,gene.vals,nrand=100,beta=2,fname=fname)
-  
-  #library(PCSF)
-  #plot.PCSF(het)
-  return(het)
-}
 
 
-  plot.results<-pred.lists%>%
+  graph.results<-all.preds%>% 
+    left_join(eval.sum)%>%
+    arrange(desc(meanCor))%>%
+    subset(numFeatures>2)%>%#subset(MSE<1500)%>%  
+    mutate(doGraph=TRUE)%>%
     subset(compound%in%c('Trametinib (GSK1120212)','Quizartinib (AC220)'))%>%
-    subset(meanCor>0.1)%>%
-    subset(Molecular!='mRNALevels')%>%
-    #subset(Molecular=='Phosphosite')%>%
+    subset(meanCor>0.5)%>%
+    dplyr::select(var='compound',method,data='Molecular',genelist='genes',doGraph)%>%
     rowwise()%>%
-        mutate(fname=paste(c(method,compound,Molecular),collapse='_'))%>%
-  group_by(fname)%>%
-  nest(df=c(DataType,genelists))%>%
-    select(df,fname)%>%
-    purrr::pmap_dfr(.,.f=plotGraphOnData)
-
-DT::datatable(plot.results)
-
-##now get summary stats as well
+    mutate(enrich=paste(selectDataMatAndPlot(var,method,data,genelist,doGraph)$Description,collapse=','))
 
 ```
+
 
 
 Now we can explore specific gene signatures based on their performance and gene sets of interest.
