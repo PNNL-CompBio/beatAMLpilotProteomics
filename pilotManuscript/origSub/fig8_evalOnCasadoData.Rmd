@@ -1,0 +1,87 @@
+---
+title: "Casado Data Comparison"
+author: "Sara Gosline"
+date: "9/14/2021"
+output: html_document
+---
+
+
+## Load Casado  dataset
+```{r load data}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+source("../beatAMLdata.R")
+library(amlresistancenetworks)
+library(wesanderson)
+if(!exists('dataLoaded')){
+  loadBeatAMLData()
+  dataLoaded=TRUE
+}
+
+
+pal<-wes_palette('Darjeeling1')
+syn=synapseLogin()
+
+
+##need to reformat to behave as expected
+cas.auc.dat<-syn$tableQuery('select * from syn26196182')$asDataFrame()%>%
+  rowwise()%>%
+  mutate(Condition=stringr::str_replace_all(compound,'Flt3i \\(midostaurin\\)','Midostaurin'))%>%
+  mutate(Condition=stringr::str_replace_all(Condition,'MEKi \\(trametinib\\)','Trametinib (GSK1120212)'))%>%
+  mutate(Condition=stringr::str_replace_all(Condition,'CK2i \\(silmitasertib\\)','Silimtasertib'))%>%
+  mutate(AUC=sensOverControl*100)%>%
+  dplyr::rename(Sample='sample')#%>%
+  #dplyr::mutate(Sample=unlist(sample))
+
+##need to check drug resutls
+cas.mol.dat<-syn$tableQuery('select * from syn26196187')$asDataFrame()%>%
+  dplyr::rename(Gene='symbol')%>%
+  dplyr::mutate(Sample=unlist(sample))%>%
+  dplyr::rename(proteinLevels='logratio')
+
+```
+
+
+## Evaluate model on outside data
+```{r build model}
+##now train model on AML and eval on depmap data
+  reg.preds<-purrr::map_df(list(protein='proteinLevels'),
+                            #  gene='geneMutations',
+                               #binGene='binaryMutations'),
+                         ~ drugMolRegressionEval(auc.dat,
+                                                 pat.data,
+                                                 .x,
+                                                 cas.auc.dat,
+                                                 cas.mol.dat,
+                                                 category='Condition'))
+
+
+
+  print("Comparing logistic preds")
+  log.reg.preds<-purrr::map_df(list(protein='proteinLevels'),
+                                 # mRNA='mRNALevels',
+                           #   gene='geneMutations',
+                              #binGene='binaryMutations'),
+                             ~ drugMolLogRegEval(auc.dat,
+                                                pat.data,.x,
+                                               cas.auc.dat,
+                                                 cas.mol.dat,
+                                               category='Condition'))
+  
+    #l.sum.tab<-logr.preds%>%subset(numFeatures>1)%>%
+    #group_by(Molecular,dataset)%>%
+    #summarize(Drugs=n_distinct(compound), Error=mean(MSE),`Mean R`=m#ean(corVal,na.rm=T))%>%
+    #mutate(Model='Logistic')
+  
+  sum.tab<-reg.preds%>%
+    mutate(Model='LASSO')%>%
+    rbind(mutate(log.reg.preds,Model='logistic'))
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+```
