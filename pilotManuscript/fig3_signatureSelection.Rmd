@@ -81,7 +81,11 @@ It is important to create a generic function that will select the features from 
 #'@param data
 #'@return output of prediction
 
-selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE,doGraph=FALSE){
+selectDataMatAndPlot<-function(drugName,
+                               method,
+                               data,genelist,
+                               doEnrich=FALSE,
+                               doGraph=FALSE){
   #get dimensionality-reduced samples
   
   ##get features from model
@@ -115,6 +119,7 @@ selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE,doGr
         }
     })%>%do.call(rbind,.)
   
+  #print(res)
   if(doEnrich){
     ##do enrichment of genes and sites separately
     subs<-subset(res,Datatype=='Phosphosite')
@@ -128,23 +133,28 @@ selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE,doGr
 
   if(doGraph){
     ##build graph
-    gene.vals<-rep(1,nrow(subset(res,DataType=='binaryMutations')))
-    names(gene.vals)<-subset(res,Datatype=='binaryMutations')$Gene
+    ures<-res%>%
+      dplyr::select(Gene,Datatype)%>%
+      distinct()
     
+    gene.vals<-rep(1,nrow(subset(ures,Datatype=='binaryMutations')))
+    names(gene.vals)<-subset(ures,Datatype=='binaryMutations')$Gene
+
+    prot.vals<-rep(1,nrow(subset(ures,Datatype=='proteinLevels')))
+    names(prot.vals)<-subset(ures,Datatype=='proteinLevels')$Gene
     
-    prot.vals<-rep(1,nrow(subset(res,Datatype=='proteinLevels')))
-    names(prot.vals)<-subset(res,Datatype=='proteinLevels')$Gene
+    rna.vals<-rep(1,nrow(subset(ures,Datatype=='mRNALevels')))
+    names(rna.vals)<-subset(ures,Datatype=='mRNALevels')$Gene
     
-    rna.vals<-rep(1,nrow(subset(res,Datatype=='mRNALevels')))
-    names(rna.vals)<-subset(res,Datatype=='mRNALevels')$Gene
+  #  print(rna.vals)
+    phos.vals<-rep(1,nrow(subset(ures,Datatype=='Phosphosite')))
+    names(phos.vals)<-subset(ures,Datatype=='Phosphosite')$Gene
     
-    phos.vals<-rep(1,nrow(subset(res,Datatype=='Phosphosite')))
-    names(phos.vals)<-subset(res,Datatype=='Phosphosite')$Gene
-    
-    fname=paste0(drugName,'_',method,'_',data,'network.gml')
-    res<-computePhosphoNetwork(phos.vals,prot.vals,gene.vals,rna.vals,fname=fname)
+    fname=paste0(drugName,'_',method,'_',data,'network')
+    netres<-computePhosphoNetwork(phos.vals,prot.vals,gene.vals,rna.vals,fname=fname)
   }
 
+  ##rename duplicated genes/transcripts
   dupes <- which(duplicated(res$Gene))
   if(length(dupes)>0)
     res <- res%>%unite(c(Gene,Datatype),col='Gene',remove=FALSE)
@@ -154,35 +164,59 @@ selectDataMatAndPlot<-function(drugName,method,data,genelist,doEnrich=FALSE,doGr
     pivot_wider(names_from=`AML sample`,
                 values_from=value,values_fill=list(value=0.0),values_fn=mean)%>%
     tibble::column_to_rownames('Gene')
-  
- # print(mat)
-    auc.d<-auc.dat%>%
+
+  ##select AUC to plot  
+  auc.d<-auc.dat%>%
     subset(Condition==drugName)%>%
     dplyr::select(`AML sample`,AUC)%>%
       distinct()%>%
-    #dplyr::rename(Sample='AML sample')%>%
       tibble::column_to_rownames('AML sample')%>%
       mutate(Sensitive=as.character(AUC<100))
     
-    gene.d<-res%>%select(Gene,Datatype)%>%
+  #get gene metadata
+  gene.d<-res%>%select(Gene,Datatype)%>%
       distinct()%>%
       tibble::column_to_rownames('Gene')
-    
-    library(pheatmap)
-    fname=paste0(drugName,'_',method,'_',data,'expression.pdf')
-    pheatmap(mat,annotation_row = gene.d,
-             annotation_col=auc.d,
-             annotation_colors=annote.colors,
-             clustering_method='ward.D2',scale='row',
-             cellwidth = 10,cellheight = 10,filename = fname)
 
-    fres<-rbind(gres,kres)
-   return(fres)
+  ##plot in heatmap    
+  library(pheatmap)
+  fname=paste0(drugName,'_',method,'_',data,'expression.pdf')
+  pheatmap(mat,annotation_row = gene.d,
+           annotation_col=auc.d,
+           annotation_colors=annote.colors,
+           clustering_method='ward.D2',scale='row',
+           cellwidth = 10,cellheight = 10,filename = fname)
+
+  #return enrichment results
+  fres<-rbind(gres,kres)
+  return(fres)
   
   }
 ```
 
 
+### Network analysis
+
+Next we take the top-performing signatures for the two drugs of interest (trametinib and quizartinib) and plot them using the PCSF. For now let's focus on the multi-omic predictors.
+
+```{r plot graphs}
+
+
+  graph.results<-all.preds%>% 
+    left_join(eval.sum)%>%
+    arrange(desc(meanCor))%>%
+    subset(numFeatures>2)%>%#subset(MSE<1500)%>%  
+    mutate(doGraph=TRUE)%>%
+   mutate(doEnrich=FALSE)%>%
+    subset(compound%in%c('Trametinib (GSK1120212)','Quizartinib (AC220)'))%>%
+    subset(meanCor>0.5)%>%
+    dplyr::select(var='compound',method,data='Molecular',genelist='genes',doEnrich,doGraph)%>%
+    rowwise()%>%
+    mutate(enrich=paste(selectDataMatAndPlot(var,method,data,genelist,doEnrich,doGraph)$Description,collapse=','))
+
+```
+
+### Functional enrichment
 We can then iterate over this function to do the plotting.
 
 
@@ -221,25 +255,7 @@ We can then iterate over this function to do the plotting.
 
 ```
 
-### Network analysis
 
-Next we take the top-performing signatures for the two drugs of interest (trametinib and quizartinib) and plot them using the PCSF. For now let's focus on the multi-omic predictors.
-
-```{r plot graphs}
-
-
-  graph.results<-all.preds%>% 
-    left_join(eval.sum)%>%
-    arrange(desc(meanCor))%>%
-    subset(numFeatures>2)%>%#subset(MSE<1500)%>%  
-    mutate(doGraph=TRUE)%>%
-    subset(compound%in%c('Trametinib (GSK1120212)','Quizartinib (AC220)'))%>%
-    subset(meanCor>0.5)%>%
-    dplyr::select(var='compound',method,data='Molecular',genelist='genes',doGraph)%>%
-    rowwise()%>%
-    mutate(enrich=paste(selectDataMatAndPlot(var,method,data,genelist,doGraph)$Description,collapse=','))
-
-```
 
 
 
